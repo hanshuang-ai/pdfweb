@@ -11,11 +11,11 @@
       <button
         @click="refreshFileList"
         :disabled="loading"
-        class="refresh-btn"
+        class="refresh-btn compact"
         :class="{ 'refreshing': loading }"
       >
         <span class="refresh-icon" :class="{ 'spin': loading }">🔄</span>
-        <span>{{ loading ? '刷新中' : '刷新' }}</span>
+        <span class="refresh-text">{{ loading ? '刷新中' : '刷新' }}</span>
       </button>
     </div>
 
@@ -98,33 +98,73 @@
           </div>
 
           <div class="file-actions">
-            <a
-              :href="file.url"
-              target="_blank"
-              class="action-btn view-btn"
-              title="查看文件"
-            >
-              <span class="btn-icon">👁️</span>
-              <span class="btn-text">查看</span>
-            </a>
+            <div class="action-buttons-left">
+              <a
+                :href="file.url"
+                target="_blank"
+                class="action-btn view-btn"
+                title="查看文件"
+              >
+                <span class="btn-icon">👁️</span>
+                <span class="btn-text">查看</span>
+              </a>
+              <button
+                @click="copyUrl(file.url)"
+                class="action-btn copy-btn"
+                title="复制链接"
+              >
+                <span class="btn-icon">📋</span>
+                <span class="btn-text">复制</span>
+              </button>
+              <button
+                @click="deleteFile(file.pathname)"
+                :disabled="deleting"
+                class="action-btn delete-btn"
+                title="删除文件"
+              >
+                <span class="btn-icon">🗑️</span>
+                <span class="btn-text">删除</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分页组件 -->
+      <div v-if="totalPages > 1" class="pagination-container">
+        <div class="pagination">
+          <button
+            @click="prevPage"
+            :disabled="currentPage === 1"
+            class="pagination-btn prev-btn"
+          >
+            <span class="btn-icon">⬅️</span>
+            <span class="btn-text">上一页</span>
+          </button>
+
+          <div class="page-numbers">
             <button
-              @click="copyUrl(file.url)"
-              class="action-btn copy-btn"
-              title="复制链接"
+              v-for="page in totalPages"
+              :key="page"
+              @click="goToPage(page)"
+              :class="['page-number', { 'active': currentPage === page }]"
             >
-              <span class="btn-icon">📋</span>
-              <span class="btn-text">复制</span>
-            </button>
-            <button
-              @click="deleteFile(file.pathname)"
-              :disabled="deleting"
-              class="action-btn delete-btn"
-              title="删除文件"
-            >
-              <span class="btn-icon">🗑️</span>
-              <span class="btn-text">删除</span>
+              {{ page }}
             </button>
           </div>
+
+          <button
+            @click="nextPage"
+            :disabled="currentPage === totalPages"
+            class="pagination-btn next-btn"
+          >
+            <span class="btn-text">下一页</span>
+            <span class="btn-icon">➡️</span>
+          </button>
+        </div>
+
+        <div class="pagination-info">
+          第 {{ currentPage }} 页，共 {{ totalPages }} 页 ({{ allFiles.length }} 个文件)
         </div>
       </div>
     </div>
@@ -138,10 +178,13 @@ export default {
   name: 'FileList',
   setup() {
     const files = ref([])
+    const allFiles = ref([])
     const loading = ref(false)
     const deleting = ref(false)
     const error = ref('')
     const totalFiles = ref(0)
+    const currentPage = ref(1)
+    const pageSize = ref(6)
 
     const fetchFileList = async () => {
       loading.value = true
@@ -156,8 +199,11 @@ export default {
         }
 
         const data = await response.json()
-        files.value = data.files || []
+        allFiles.value = data.files || []
         totalFiles.value = data.total || 0
+        currentPage.value = 1
+        updateTotalPages()
+        updateFilesForCurrentPage()
         console.log(`Fetched ${totalFiles.value} files`)
 
       } catch (err) {
@@ -224,12 +270,45 @@ export default {
       }
     }
 
+    // 更新当前页的文件列表
+    const updateFilesForCurrentPage = () => {
+      const startIndex = (currentPage.value - 1) * pageSize.value
+      const endIndex = startIndex + pageSize.value
+      files.value = allFiles.value.slice(startIndex, endIndex)
+    }
+
+    // 获取总页数
+    const totalPages = ref(1)
+
+    // 计算总页数
+    const updateTotalPages = () => {
+      totalPages.value = Math.ceil(allFiles.value.length / pageSize.value)
+    }
+
+    // 切换页面
+    const goToPage = (page) => {
+      if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page
+        updateFilesForCurrentPage()
+      }
+    }
+
+    // 上一页
+    const prevPage = () => {
+      goToPage(currentPage.value - 1)
+    }
+
+    // 下一页
+    const nextPage = () => {
+      goToPage(currentPage.value + 1)
+    }
+
     // 获取文件总大小
     const getTotalSize = () => {
-      if (files.value.length === 0) return '0 B'
+      if (allFiles.value.length === 0) return '0 B'
 
       // 这里简化处理，实际应该解析所有文件大小并累加
-      const total = files.value.length > 0 ? '多个文件' : '0 B'
+      const total = allFiles.value.length > 0 ? '多个文件' : '0 B'
       return total
     }
 
@@ -291,17 +370,24 @@ export default {
 
     return {
       files,
+      allFiles,
       loading,
       deleting,
       error,
       totalFiles,
+      currentPage,
+      pageSize,
+      totalPages,
       refreshFileList,
       copyUrl,
       deleteFile,
       getTotalSize,
       getFileTypeIcon,
       getFileTypeLabel,
-      getFileTypeClass
+      getFileTypeClass,
+      goToPage,
+      prevPage,
+      nextPage
     }
   }
 }
@@ -361,15 +447,23 @@ export default {
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   color: white;
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
+}
+
+.refresh-btn.compact .refresh-icon {
+  font-size: 0.875rem;
+}
+
+.refresh-btn.compact .refresh-text {
+  font-size: 0.75rem;
 }
 
 .refresh-btn:hover:not(:disabled) {
@@ -607,24 +701,28 @@ export default {
 
 .file-actions {
   display: flex;
-  gap: 0.75rem;
-  justify-content: center;
+  justify-content: flex-start;
+}
+
+.action-buttons-left {
+  display: flex;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
 .action-btn {
-  padding: 0.625rem 1rem;
+  padding: 0.375rem 0.75rem;
   border: none;
-  border-radius: 10px;
-  font-size: 0.875rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  min-width: 100px;
+  gap: 0.375rem;
+  min-width: 70px;
   justify-content: center;
 }
 
@@ -666,11 +764,11 @@ export default {
 }
 
 .btn-icon {
-  font-size: 1rem;
+  font-size: 0.875rem;
 }
 
 .btn-text {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
 }
 
 /* 响应式设计 */
@@ -750,6 +848,92 @@ export default {
   }
 }
 
+/* 分页样式 */
+.pagination-container {
+  padding: 1.5rem 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.pagination-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: auto;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.pagination-btn:disabled {
+  background: #cbd5e0;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.page-number {
+  background: rgba(255, 255, 255, 0.8);
+  color: #64748b;
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  min-width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-number:hover {
+  background: #6366f1;
+  color: white;
+  border-color: #6366f1;
+  transform: translateY(-1px);
+}
+
+.page-number.active {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border-color: #6366f1;
+  transform: scale(1.1);
+}
+
+.pagination-info {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
 @media (max-width: 480px) {
   .card-header {
     padding: 1rem;
@@ -774,6 +958,34 @@ export default {
   .action-btn {
     width: 100%;
     min-width: auto;
+  }
+
+  .pagination-container {
+    padding: 1rem 1.5rem;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .page-numbers {
+    gap: 0.375rem;
+  }
+
+  .page-number {
+    padding: 0.375rem 0.625rem;
+    font-size: 0.625rem;
+    min-width: 32px;
+  }
+
+  .pagination-btn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.625rem;
+  }
+
+  .pagination-info {
+    font-size: 0.625rem;
   }
 }
 </style>
