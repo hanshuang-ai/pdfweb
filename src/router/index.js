@@ -1,18 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import App from '../App.vue'
+import HomeView from '../views/HomeView.vue'
 import PDFEditor from '../components/PDFEditor.vue'
 
 const routes = [
   {
     path: '/',
     name: 'Home',
-    component: App
+    component: HomeView
   },
   {
     path: '/editor',
     name: 'PDFEditor',
-    component: PDFEditor,
-    props: true
+    component: PDFEditor
   }
 ]
 

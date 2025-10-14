@@ -1,113 +1,70 @@
 <template>
-  <div id="app">
-    <!-- 路由视图 -->
-    <router-view />
+  <div class="home-view">
+    <div class="app-background">
+      <div class="background-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+      </div>
+    </div>
 
-    <!-- 全局组件（在所有页面都显示） -->
-    <ToastNotification />
-    <ConfirmDialog
-      :visible="confirmDialog.visible"
-      :title="confirmDialog.title"
-      :message="confirmDialog.message"
-      :details="confirmDialog.details"
-      :confirmText="confirmDialog.confirmText"
-      :cancelText="confirmDialog.cancelText"
-      :type="confirmDialog.type"
-      :loading="confirmDialog.loading"
-      @confirm="handleConfirm"
-      @cancel="handleCancel"
-      @update:visible="confirmDialog.visible = $event"
-    />
+    <div class="app-header">
+      <div class="header-content">
+        <h1 class="app-title">
+          <span class="icon">☁️</span>
+          文件阅读
+        </h1>
+        <p class="app-subtitle">安全、快速的文件上传与管理平台</p>
+      </div>
+    </div>
+
+    <div class="app-container">
+      <div class="main-content">
+        <!-- 左侧：上传区域 -->
+        <div class="upload-section">
+          <FileUploader @upload-success="refreshFileList" />
+        </div>
+
+        <!-- 右侧：文件列表 -->
+        <div class="file-list-section">
+          <FileList ref="fileListRef" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部信息 -->
+    <div class="app-footer">
+      <div class="footer-content">
+        <p>💖 基于 Vue 3 + Vercel Blob 构建</p>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import ToastNotification from './components/ToastNotification.vue'
-import ConfirmDialog from './components/ConfirmDialog.vue'
+import FileUploader from '../components/FileUploader.vue'
+import FileList from '../components/FileList.vue'
 
 export default {
-  name: 'App',
+  name: 'HomeView',
   components: {
-    ToastNotification,
-    ConfirmDialog
-  },
-  data() {
-    return {
-      confirmDialog: {
-        visible: false,
-        title: '',
-        message: '',
-        details: '',
-        confirmText: '确认',
-        cancelText: '取消',
-        type: 'warning',
-        loading: false,
-        resolve: null,
-        reject: null
-      }
-    }
+    FileUploader,
+    FileList
   },
   methods: {
-    // 显示确认对话框
-    showConfirm(options) {
-      const {
-        title = '确认操作',
-        message,
-        details = '',
-        confirmText = '确认',
-        cancelText = '取消',
-        type = 'warning'
-      } = options
-
-      return new Promise((resolve, reject) => {
-        this.confirmDialog = {
-          visible: true,
-          title,
-          message,
-          details,
-          confirmText,
-          cancelText,
-          type,
-          loading: false,
-          resolve,
-          reject
-        }
-      })
-    },
-
-    // 确认操作
-    handleConfirm() {
-      if (this.confirmDialog.resolve) {
-        this.confirmDialog.resolve(true)
+    refreshFileList() {
+      // 当文件上传成功后，刷新文件列表
+      if (this.$refs.fileListRef) {
+        this.$refs.fileListRef.refreshFileList()
       }
-      this.hideConfirmDialog()
-    },
-
-    // 取消操作
-    handleCancel() {
-      if (this.confirmDialog.reject) {
-        this.confirmDialog.reject(false)
-      }
-      this.hideConfirmDialog()
-    },
-
-    // 隐藏对话框
-    hideConfirmDialog() {
-      this.confirmDialog.visible = false
-      this.confirmDialog.loading = false
-      this.confirmDialog.resolve = null
-      this.confirmDialog.reject = null
     }
-  },
-  mounted() {
-    // 全局暴露确认对话框方法
-    window.$confirm = this.showConfirm
   }
 }
 </script>
 
-<style>
-#app {
+<style scoped>
+/* 复制原有的 App.vue 样式 */
+.home-view {
   width: 100%;
   min-height: 100vh;
   position: relative;

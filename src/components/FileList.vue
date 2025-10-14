@@ -257,8 +257,8 @@ export default {
 			const params = encodeURIComponent(JSON.stringify(fileData));
 			const editorUrl = `/editor?file=${params}`;
 
-			// 打开编辑页面
-			window.location.href = editorUrl;
+			// 使用 Vue Router 进行导航
+			this.$router.push(editorUrl);
 		};
 
 		const deleteFile = async (pathname) => {
