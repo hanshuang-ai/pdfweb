@@ -184,7 +184,7 @@ export default {
     const error = ref('')
     const totalFiles = ref(0)
     const currentPage = ref(1)
-    const pageSize = ref(6)
+    const pageSize = ref(3)
 
     const fetchFileList = async () => {
       loading.value = true
@@ -307,9 +307,38 @@ export default {
     const getTotalSize = () => {
       if (allFiles.value.length === 0) return '0 B'
 
-      // 这里简化处理，实际应该解析所有文件大小并累加
-      const total = allFiles.value.length > 0 ? '多个文件' : '0 B'
-      return total
+      // 真实计算所有文件大小
+      let totalBytes = 0
+
+      allFiles.value.forEach(file => {
+        // 解析文件大小，支持各种格式 (KB, MB, GB)
+        if (file.size) {
+          totalBytes += file.size
+        } else if (file.formattedSize) {
+          // 从格式化的字符串中解析大小
+          const sizeStr = file.formattedSize.toLowerCase()
+          if (sizeStr.includes('gb')) {
+            totalBytes += parseFloat(sizeStr) * 1024 * 1024 * 1024
+          } else if (sizeStr.includes('mb')) {
+            totalBytes += parseFloat(sizeStr) * 1024 * 1024
+          } else if (sizeStr.includes('kb')) {
+            totalBytes += parseFloat(sizeStr) * 1024
+          } else if (sizeStr.includes('b')) {
+            totalBytes += parseFloat(sizeStr)
+          }
+        }
+      })
+
+      // 格式化总大小
+      const formatFileSize = (bytes) => {
+        if (bytes === 0) return '0 B'
+        const k = 1024
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+        const i = Math.floor(Math.log(bytes) / Math.log(k))
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+      }
+
+      return formatFileSize(totalBytes)
     }
 
     // 获取文件类型图标
@@ -627,6 +656,7 @@ export default {
   margin-bottom: 1rem;
   display: flex;
   justify-content: center;
+  display: none;
 }
 
 .file-type-icon {
