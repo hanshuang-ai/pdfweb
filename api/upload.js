@@ -3,7 +3,7 @@ import { put } from '@vercel/blob';
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: 10 * 1024 * 1024, // 10MB
+      sizeLimit: '10mb',
     },
   },
 };
