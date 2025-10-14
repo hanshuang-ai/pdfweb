@@ -12,7 +12,7 @@
       <div class="header-content">
         <h1 class="app-title">
           <span class="icon">☁️</span>
-          Vercel Blob 文件管理
+          文件阅读管理
         </h1>
         <p class="app-subtitle">安全、快速的文件上传与管理平台</p>
       </div>
@@ -41,6 +41,21 @@
 
     <!-- Toast 通知组件 -->
     <ToastNotification />
+
+    <!-- 确认对话框组件 -->
+    <ConfirmDialog
+      :visible="confirmDialog.visible"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :details="confirmDialog.details"
+      :confirmText="confirmDialog.confirmText"
+      :cancelText="confirmDialog.cancelText"
+      :type="confirmDialog.type"
+      :loading="confirmDialog.loading"
+      @confirm="handleConfirm"
+      @cancel="handleCancel"
+      @update:visible="confirmDialog.visible = $event"
+    />
   </div>
 </template>
 
@@ -48,13 +63,31 @@
 import FileUploader from './components/FileUploader.vue'
 import FileList from './components/FileList.vue'
 import ToastNotification from './components/ToastNotification.vue'
+import ConfirmDialog from './components/ConfirmDialog.vue'
 
 export default {
   name: 'App',
   components: {
     FileUploader,
     FileList,
-    ToastNotification
+    ToastNotification,
+    ConfirmDialog
+  },
+  data() {
+    return {
+      confirmDialog: {
+        visible: false,
+        title: '',
+        message: '',
+        details: '',
+        confirmText: '确认',
+        cancelText: '取消',
+        type: 'warning',
+        loading: false,
+        resolve: null,
+        reject: null
+      }
+    }
   },
   methods: {
     refreshFileList() {
@@ -62,7 +95,62 @@ export default {
       if (this.$refs.fileListRef) {
         this.$refs.fileListRef.refreshFileList()
       }
+    },
+
+    // 显示确认对话框
+    showConfirm(options) {
+      const {
+        title = '确认操作',
+        message,
+        details = '',
+        confirmText = '确认',
+        cancelText = '取消',
+        type = 'warning'
+      } = options
+
+      return new Promise((resolve, reject) => {
+        this.confirmDialog = {
+          visible: true,
+          title,
+          message,
+          details,
+          confirmText,
+          cancelText,
+          type,
+          loading: false,
+          resolve,
+          reject
+        }
+      })
+    },
+
+    // 确认操作
+    handleConfirm() {
+      if (this.confirmDialog.resolve) {
+        this.confirmDialog.resolve(true)
+      }
+      this.hideConfirmDialog()
+    },
+
+    // 取消操作
+    handleCancel() {
+      if (this.confirmDialog.reject) {
+        this.confirmDialog.reject(false)
+      }
+      this.hideConfirmDialog()
+    },
+
+    // 隐藏对话框
+    hideConfirmDialog() {
+      this.confirmDialog.visible = false
+      this.confirmDialog.loading = false
+      this.confirmDialog.resolve = null
+      this.confirmDialog.reject = null
     }
+  },
+  mounted() {
+    // 全局暴露确认对话框方法
+    window.$confirm = this.showConfirm
   }
 }
 </script>

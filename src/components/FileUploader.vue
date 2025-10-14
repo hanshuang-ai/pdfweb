@@ -9,7 +9,7 @@
     </div>
 
     <!-- 状态信息 -->
-    <div class="status-panel">
+    <!-- <div class="status-panel">
       <div class="status-item">
         <div class="status-icon">☁️</div>
         <div class="status-text">
@@ -33,7 +33,7 @@
           </span>
         </div>
       </div>
-    </div>
+    </div> -->
 
     <!-- 上传区域 -->
     <div

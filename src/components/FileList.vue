@@ -238,7 +238,20 @@ export default {
 		};
 
 		const deleteFile = async (pathname) => {
-			if (!confirm("确定要删除这个文件吗？此操作不可撤销。")) {
+			// 获取文件名用于显示
+			const file = allFiles.value.find(f => f.pathname === pathname);
+			const fileName = file ? file.originalName : '这个文件';
+
+			const confirmed = await window.$confirm({
+				title: '删除文件',
+				message: `确定要删除文件 "${fileName}" 吗？`,
+				details: '此操作不可撤销，文件将被永久删除。',
+				confirmText: '删除',
+				cancelText: '取消',
+				type: 'danger'
+			});
+
+			if (!confirmed) {
 				return;
 			}
 
