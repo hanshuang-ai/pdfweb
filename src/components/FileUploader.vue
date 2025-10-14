@@ -84,7 +84,8 @@ import { blobConfig, generateUniqueFilename, validateConfig, getBlobInfo } from 
 
 export default {
   name: 'FileUploader',
-  setup() {
+  emits: ['upload-success'],
+  setup(props, { emit }) {
     const fileInput = ref(null)
     const selectedFile = ref(null)
     const uploading = ref(false)
@@ -234,6 +235,9 @@ export default {
 
         fileUrl.value = url
         success.value = true
+
+        // 触发上传成功事件，通知父组件刷新文件列表
+        emit('upload-success')
 
         // 重置表单
         setTimeout(() => {
