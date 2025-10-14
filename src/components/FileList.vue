@@ -185,10 +185,12 @@
 
 <script>
 import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
 
 export default {
 	name: "FileList",
 	setup() {
+		const router = useRouter();
 		const files = ref([]);
 		const allFiles = ref([]);
 		const loading = ref(false);
@@ -258,7 +260,7 @@ export default {
 			const editorUrl = `/editor?file=${params}`;
 
 			// 使用 Vue Router 进行导航
-			this.$router.push(editorUrl);
+			router.push(editorUrl);
 		};
 
 		const deleteFile = async (pathname) => {

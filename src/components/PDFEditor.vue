@@ -28,6 +28,7 @@
 
 <script>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import PDFReader from './PDFReader.vue'
 import { put } from '@vercel/blob'
 import { blobConfig } from '../utils/blobConfig.js'
@@ -36,6 +37,13 @@ export default {
   name: 'PDFEditor',
   components: {
     PDFReader
+  },
+  setup() {
+    const router = useRouter();
+
+    return {
+      router
+    };
   },
   data() {
     return {
@@ -63,17 +71,17 @@ export default {
         } catch (err) {
           console.error('解析文件参数失败:', err)
           window.$toast.error('参数错误', '无法解析文件信息')
-          this.$router.push('/')
+          this.router.push('/')
         }
       } else {
         window.$toast.error('参数缺失', '未找到文件信息')
-        this.$router.push('/')
+        this.router.push('/')
       }
     },
 
     // 返回文件列表
     goBack() {
-      this.$router.push('/')
+      this.router.push('/')
     },
 
     // 下载 PDF 副本
