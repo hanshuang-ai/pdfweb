@@ -3,7 +3,7 @@ import { put } from '@vercel/blob';
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',
+      sizeLimit: '4mb', // Vercel免费版限制是4.5MB
     },
   },
 };
