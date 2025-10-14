@@ -63,14 +63,14 @@ export const validateConfigOld = () => {
 }
 */
 
-// 获取Blob存储信息 (新方案：API代理)
+// 获取Blob存储信息 (新方案：服务端直传)
 export const getBlobInfo = () => {
   return {
     storeId: blobConfig.storeId,
     region: blobConfig.region,
     baseUrl: blobConfig.baseUrl,
-    status: 'API代理模式 (已配置)',
-    mode: 'API代理 (方案2)'
+    status: '服务端直传 (已配置)',
+    mode: '服务端直传 (最安全)'
   }
 }
 

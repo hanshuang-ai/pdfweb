@@ -162,51 +162,33 @@ export default {
         // 生成唯一文件名
         const filename = generateUniqueFilename(selectedFile.value)
 
-        // 步骤1: 从API获取上传URL
-        uploadProgress.value = 10
-        const response = await fetch('/api/upload-url', {
+        // 模拟上传进度
+        const progressInterval = setInterval(() => {
+          if (uploadProgress.value < 90) {
+            uploadProgress.value += Math.random() * 20
+          }
+        }, 300)
+
+        // 直接上传文件到API端点 (方案1: 完全服务端处理)
+        uploadProgress.value = 20
+        const formData = new FormData()
+        formData.append('file', selectedFile.value)
+        formData.append('filename', filename)
+
+        const response = await fetch('/api/upload', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            filename,
-            contentType: selectedFile.value.type || 'application/octet-stream'
-          })
+          body: formData
         })
 
         if (!response.ok) {
-          throw new Error(`获取上传URL失败: ${response.statusText}`)
+          const errorData = await response.json()
+          throw new Error(errorData.details || `上传失败: ${response.statusText}`)
         }
 
-        const { uploadUrl, url } = await response.json()
-        uploadProgress.value = 30
-
-        // 步骤2: 直接上传文件到Blob存储
-        const formData = new FormData()
-        formData.append('file', selectedFile.value)
-
-        // 模拟上传进度
-        const progressInterval = setInterval(() => {
-          if (uploadProgress.value < 85) {
-            uploadProgress.value += Math.random() * 15
-          }
-        }, 200)
-
-        const uploadResponse = await fetch(uploadUrl, {
-          method: 'PUT',
-          body: selectedFile.value,
-          headers: {
-            'Content-Type': selectedFile.value.type || 'application/octet-stream',
-          }
-        })
+        const { url } = await response.json()
 
         clearInterval(progressInterval)
         uploadProgress.value = 100
-
-        if (!uploadResponse.ok) {
-          throw new Error(`文件上传失败: ${uploadResponse.statusText}`)
-        }
 
         fileUrl.value = url
         success.value = true

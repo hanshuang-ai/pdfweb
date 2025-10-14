@@ -1,5 +1,13 @@
 import { put } from '@vercel/blob';
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: 10 * 1024 * 1024, // 10MB
+    },
+  },
+};
+
 export default async function handler(req, res) {
   // 允许CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,41 +23,47 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { filename, contentType } = req.body;
+    console.log('Upload request received');
 
-    if (!filename) {
-      return res.status(400).json({ error: 'Filename is required' });
+    // 从请求中获取文件和文件名
+    const file = req.body.file;
+    const filename = req.body.filename;
+
+    if (!file || !filename) {
+      return res.status(400).json({
+        error: 'Missing file or filename',
+        hasFile: !!file,
+        hasFilename: !!filename
+      });
     }
 
-    console.log('Generating upload URL for:', filename);
+    console.log('Processing upload:', filename);
     console.log('Token exists:', !!process.env.BLOB_READ_WRITE_TOKEN);
 
-    // 使用正确的Vercel Blob API生成上传URL
-    const blob = await put(filename, new Uint8Array(0), {
+    // 上传文件到Vercel Blob
+    const blob = await put(filename, file, {
       access: 'public',
-      contentType: contentType || 'application/octet-stream',
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
 
-    console.log('Upload URL generated successfully:', blob.url);
+    console.log('Upload successful:', blob.url);
 
     res.status(200).json({
       url: blob.url,
-      uploadUrl: blob.url, // Vercel Blob返回的URL可以直接用于PUT上传
       pathname: blob.pathname,
+      uploadedAt: blob.uploadedAt,
     });
 
   } catch (error) {
-    console.error('Error generating upload URL:', error);
+    console.error('Upload error:', error);
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
       tokenPresent: !!process.env.BLOB_READ_WRITE_TOKEN,
-      envKeys: Object.keys(process.env).filter(key => key.includes('BLOB'))
     });
 
     res.status(500).json({
-      error: 'Failed to generate upload URL',
+      error: 'Upload failed',
       details: error.message
     });
   }
