@@ -68,6 +68,7 @@
 
           <p v-if="!selectedFile" class="upload-hint">
             或者 <span class="link-text">点击选择文件</span>
+            <br><small style="color: #94a3b8;">支持最大 100MB 文件上传</small>
           </p>
           <p v-else-if="uploading" class="upload-hint">
             请稍候，文件正在处理中
@@ -224,13 +225,6 @@ export default {
     const uploadFile = async () => {
       if (!selectedFile.value) return
 
-      // 检查文件大小 (Vercel免费版限制4.5MB)
-      const maxSize = 4.5 * 1024 * 1024 // 4.5MB
-      if (selectedFile.value.size > maxSize) {
-        error.value = `文件太大！最大支持 ${formatFileSize(maxSize)}，当前文件 ${formatFileSize(selectedFile.value.size)}`
-        return
-      }
-
       uploading.value = true
       error.value = ''
       success.value = false
@@ -240,70 +234,36 @@ export default {
         // 生成唯一文件名
         const filename = generateUniqueFilename(selectedFile.value)
 
-        // 模拟上传进度
-        const progressInterval = setInterval(() => {
-          if (uploadProgress.value < 90) {
-            uploadProgress.value += Math.random() * 20
-          }
-        }, 300)
-
-        // 转换文件为base64上传 (避免FormData解析问题)
-        uploadProgress.value = 20
-
         console.log('=== FRONTEND UPLOAD START ===');
         console.log('Selected file:', selectedFile.value.name);
         console.log('File size:', selectedFile.value.size);
         console.log('File type:', selectedFile.value.type);
         console.log('Generated filename:', filename);
 
-        const fileReader = new FileReader()
-        const base64Promise = new Promise((resolve, reject) => {
-          fileReader.onload = () => resolve(fileReader.result)
-          fileReader.onerror = reject
-        })
-        fileReader.readAsDataURL(selectedFile.value)
+        uploadProgress.value = 10
 
-        const base64Data = await base64Promise
-        console.log('File converted to base64, length:', base64Data.length);
+        // 检查文件大小决定上传方式
+        const maxApiSize = 4.5 * 1024 * 1024 // 4.5MB (API限制)
+        const maxDirectSize = 100 * 1024 * 1024 // 100MB (Vercel Blob限制)
 
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            file: base64Data,
-            filename: filename,
-            originalName: selectedFile.value.name,
-            mimeType: selectedFile.value.type
-          })
-        })
-        console.log('API response status:', response.status);
-
-        if (!response.ok) {
-          let errorMessage = `上传失败: ${response.statusText}`
-
-          // 特殊处理413错误 (文件过大)
-          if (response.status === 413) {
-            errorMessage = '文件太大！请选择小于4.5MB的文件'
-          } else {
-            try {
-              const errorData = await response.json()
-              errorMessage = errorData.details || errorData.error || errorMessage
-            } catch (e) {
-              // 如果无法解析JSON，使用默认错误消息
-            }
-          }
-
-          throw new Error(errorMessage)
+        if (selectedFile.value.size > maxDirectSize) {
+          error.value = `文件太大！最大支持 ${formatFileSize(maxDirectSize)}，当前文件 ${formatFileSize(selectedFile.value.size)}`
+          return
         }
 
-        const { url } = await response.json()
+        let uploadResult
 
-        clearInterval(progressInterval)
-        uploadProgress.value = 100
+        if (selectedFile.value.size <= maxApiSize) {
+          // 小文件：通过API上传 (更安全)
+          console.log('Using API upload for small file');
+          uploadResult = await uploadViaAPI(filename)
+        } else {
+          // 大文件：直接上传到Vercel Blob (绕过API限制)
+          console.log('Using direct upload for large file');
+          uploadResult = await uploadDirectly(filename)
+        }
 
-        fileUrl.value = url
+        fileUrl.value = uploadResult.url
         success.value = true
 
         // 触发上传成功事件，通知父组件刷新文件列表
@@ -322,6 +282,80 @@ export default {
         error.value = `上传失败: ${err.message || '未知错误'}`
       } finally {
         uploading.value = false
+      }
+    }
+
+    // 通过API上传 (小文件，更安全)
+    const uploadViaAPI = async (filename) => {
+      uploadProgress.value = 30
+
+      const fileReader = new FileReader()
+      const base64Promise = new Promise((resolve, reject) => {
+        fileReader.onload = () => resolve(fileReader.result)
+        fileReader.onerror = reject
+      })
+      fileReader.readAsDataURL(selectedFile.value)
+
+      const base64Data = await base64Promise
+      console.log('File converted to base64, length:', base64Data.length);
+
+      uploadProgress.value = 60
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file: base64Data,
+          filename: filename,
+          originalName: selectedFile.value.name,
+          mimeType: selectedFile.value.type
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.details || `API上传失败: ${response.statusText}`)
+      }
+
+      uploadProgress.value = 100
+      return await response.json()
+    }
+
+    // 直接上传到Vercel Blob (大文件，绕过API限制)
+    const uploadDirectly = async (filename) => {
+      uploadProgress.value = 30
+
+      console.log('Direct uploading to Vercel Blob...');
+
+      // 模拟上传进度
+      const progressInterval = setInterval(() => {
+        if (uploadProgress.value < 90) {
+          uploadProgress.value += Math.random() * 15
+        }
+      }, 500)
+
+      try {
+        // 直接使用客户端SDK上传
+        const { put } = await import('@vercel/blob')
+
+        const blob = await put(filename, selectedFile.value, {
+          access: 'public',
+          token: blobConfig.token,
+          contentType: selectedFile.value.type || 'application/octet-stream'
+        })
+
+        clearInterval(progressInterval)
+        uploadProgress.value = 100
+
+        console.log('Direct upload successful:', blob.url);
+        return { url: blob.url }
+
+      } catch (directError) {
+        clearInterval(progressInterval)
+        console.error('Direct upload failed:', directError);
+        throw new Error(`直接上传失败: ${directError.message}`)
       }
     }
 
@@ -399,6 +433,8 @@ export default {
       handleDragLeave,
       handleDrop,
       uploadFile,
+      uploadViaAPI,
+      uploadDirectly,
       formatFileSize
     }
   }
