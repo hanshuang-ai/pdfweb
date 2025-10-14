@@ -1,48 +1,49 @@
 <template>
   <div id="app">
-    <div class="app-background">
-      <div class="background-shapes">
-        <div class="shape shape-1"></div>
-        <div class="shape shape-2"></div>
-        <div class="shape shape-3"></div>
-      </div>
-    </div>
-
-    <div class="app-header">
-      <div class="header-content">
-        <h1 class="app-title">
-          <span class="icon">☁️</span>
-          文件阅读管理
-        </h1>
-        <p class="app-subtitle">安全、快速的文件上传与管理平台</p>
-      </div>
-    </div>
-
-    <div class="app-container">
-      <div class="main-content">
-        <!-- 左侧：上传区域 -->
-        <div class="upload-section">
-          <FileUploader @upload-success="refreshFileList" />
-        </div>
-
-        <!-- 右侧：文件列表 -->
-        <div class="file-list-section">
-          <FileList ref="fileListRef" />
+    <router-view>
+      <!-- 首页内容 -->
+      <div class="app-background">
+        <div class="background-shapes">
+          <div class="shape shape-1"></div>
+          <div class="shape shape-2"></div>
+          <div class="shape shape-3"></div>
         </div>
       </div>
-    </div>
 
-    <!-- 底部信息 -->
-    <div class="app-footer">
-      <div class="footer-content">
-        <p>💖 基于 Vue 3 + Vercel Blob 构建</p>
+      <div class="app-header">
+        <div class="header-content">
+          <h1 class="app-title">
+            <span class="icon">☁️</span>
+            文件阅读
+          </h1>
+          <p class="app-subtitle">安全、快速的文件上传与管理平台</p>
+        </div>
       </div>
-    </div>
 
-    <!-- Toast 通知组件 -->
+      <div class="app-container">
+        <div class="main-content">
+          <!-- 左侧：上传区域 -->
+          <div class="upload-section">
+            <FileUploader @upload-success="refreshFileList" />
+          </div>
+
+          <!-- 右侧：文件列表 -->
+          <div class="file-list-section">
+            <FileList ref="fileListRef" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部信息 -->
+      <div class="app-footer">
+        <div class="footer-content">
+          <p>💖 基于 Vue 3 + Vercel Blob 构建</p>
+        </div>
+      </div>
+    </router-view>
+
+    <!-- 全局组件（在所有页面都显示） -->
     <ToastNotification />
-
-    <!-- 确认对话框组件 -->
     <ConfirmDialog
       :visible="confirmDialog.visible"
       :title="confirmDialog.title"

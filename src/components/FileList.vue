@@ -106,6 +106,15 @@
 									<span class="btn-text">查看</span>
 								</a>
 								<button
+									v-if="getFileTypeLabel(file.contentType, file.pathname) === 'PDF'"
+									@click="editPDF(file)"
+									class="action-btn edit-btn"
+									title="编辑PDF"
+								>
+									<span class="btn-icon">📝</span>
+									<span class="btn-text">编辑</span>
+								</button>
+								<button
 									@click="copyUrl(file.url)"
 									class="action-btn copy-btn"
 									title="复制链接"
@@ -235,6 +244,21 @@ export default {
 				document.body.removeChild(textArea);
 				window.$toast.success("复制成功", "链接已复制到剪贴板！");
 			}
+		};
+
+		const editPDF = (file) => {
+			// 构建编辑页面 URL 参数
+			const fileData = {
+				url: file.url,
+				name: file.originalName,
+				pathname: file.pathname
+			};
+
+			const params = encodeURIComponent(JSON.stringify(fileData));
+			const editorUrl = `/editor?file=${params}`;
+
+			// 打开编辑页面
+			window.location.href = editorUrl;
 		};
 
 		const deleteFile = async (pathname) => {
@@ -544,6 +568,7 @@ export default {
 			totalPages,
 			refreshFileList,
 			copyUrl,
+			editPDF,
 			deleteFile,
 			getTotalSize,
 			getFileTypeIcon,
@@ -986,6 +1011,16 @@ export default {
 .copy-btn:hover {
 	transform: translateY(-2px);
 	box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+}
+
+.edit-btn {
+	background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+	color: white;
+}
+
+.edit-btn:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 6px 16px rgba(139, 92, 246, 0.3);
 }
 
 .delete-btn {

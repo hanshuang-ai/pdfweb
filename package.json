@@ -10,7 +10,11 @@
   },
   "dependencies": {
     "@vercel/blob": "^2.0.0",
-    "vue": "^3.4.0"
+    "jspdf": "^3.0.3",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.4.296",
+    "vue": "^3.4.0",
+    "vue-router": "^4.6.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",
