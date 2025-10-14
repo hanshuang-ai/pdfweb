@@ -2,6 +2,16 @@
   <div class="container">
     <h1>📤 Vercel Blob 文件上传</h1>
 
+    <!-- Blob 配置信息 -->
+    <div style="background: #f0f4f8; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
+      <p style="margin: 0; color: #4a5568;">
+        <strong>存储信息:</strong>
+        Store ID: {{ blobInfo.storeId }} |
+        地区: {{ blobInfo.region }} |
+        状态: <span :style="{ color: blobInfo.status === '已配置' ? '#38a169' : '#e53e3e' }">{{ blobInfo.status }}</span>
+      </p>
+    </div>
+
     <div
       class="upload-area"
       :class="{ 'dragover': isDragOver }"
@@ -67,8 +77,9 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { put } from '@vercel/blob'
+import { blobConfig, generateUniqueFilename, validateConfig, getBlobInfo } from '../utils/blobConfig.js'
 
 export default {
   name: 'FileUploader',
@@ -81,6 +92,18 @@ export default {
     const success = ref(false)
     const fileUrl = ref('')
     const isDragOver = ref(false)
+    const blobInfo = ref({ storeId: '', region: '', status: '未配置' })
+
+    // 初始化时检查配置
+    onMounted(() => {
+      try {
+        validateConfig()
+        blobInfo.value = getBlobInfo()
+      } catch (err) {
+        error.value = `配置错误: ${err.message}`
+        blobInfo.value = getBlobInfo()
+      }
+    })
 
     const triggerFileInput = () => {
       fileInput.value.click()
@@ -129,16 +152,22 @@ export default {
     const uploadFile = async () => {
       if (!selectedFile.value) return
 
+      // 验证配置
+      try {
+        validateConfig()
+      } catch (err) {
+        error.value = `配置错误: ${err.message}`
+        return
+      }
+
       uploading.value = true
       error.value = ''
       success.value = false
       uploadProgress.value = 0
 
       try {
-        // 创建一个带有时间戳的唯一文件名
-        const timestamp = Date.now()
-        const randomString = Math.random().toString(36).substring(2, 15)
-        const filename = `${timestamp}-${randomString}-${selectedFile.value.name}`
+        // 生成唯一文件名
+        const filename = generateUniqueFilename(selectedFile.value)
 
         // 模拟上传进度
         const progressInterval = setInterval(() => {
@@ -149,8 +178,8 @@ export default {
 
         // 上传文件到Vercel Blob
         const blob = await put(filename, selectedFile.value, {
-          access: 'public',
-          token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN,
+          ...blobConfig.uploadOptions,
+          token: blobConfig.token,
         })
 
         clearInterval(progressInterval)
@@ -184,6 +213,7 @@ export default {
       success,
       fileUrl,
       isDragOver,
+      blobInfo,
       triggerFileInput,
       handleFileSelect,
       handleDragOver,

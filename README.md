@@ -2,6 +2,12 @@
 
 一个基于 Vue 3 的文件上传应用，支持将文件上传到 Vercel Blob Storage。
 
+## 项目配置信息
+
+- **Store ID**: `store_fmATeK5mFkUM5GBd`
+- **地区**: `hkg1` (香港)
+- **Base URL**: `https://fmatek5mfkum5gbd.public.blob.vercel-storage.com`
+
 ## 功能特性
 
 - 📁 支持拖拽上传
@@ -21,31 +27,22 @@ npm install
 
 ### 2. 配置环境变量
 
-1. 登录 [Vercel 控制台](https://vercel.com/dashboard)
-2. 进入你的项目设置
-3. 在 "Environment Variables" 中添加一个新的变量：
-   - **名称**: `BLOB_READ_WRITE_TOKEN`
-   - **值**: 你的 Blob 读写令牌
+项目已预配置以下Blob存储信息：
+- **Store ID**: `store_fmATeK5mFkUM5GBd`
+- **地区**: `hkg1` (香港)
+- **读写令牌**: 已配置在 `.env.local` 中
 
-4. 如果还没有 Blob 存储配置：
-   - 在 Vercel 项目中添加 Blob 存储
-   - 创建一个读写令牌
+环境变量配置：
+```env
+VITE_BLOB_READ_WRITE_TOKEN=vercel_blob_rw_fmATeK5mFkUM5GBd_R1FA5xYcMGA6v7nYb64wRsoaQQu1cS
+VITE_BLOB_STORE_ID=store_fmATeK5mFkUM5GBd
+VITE_BLOB_REGION=hkg1
+VITE_BLOB_BASE_URL=https://fmatek5mfkum5gbd.public.blob.vercel-storage.com
+```
 
 ### 3. 本地开发
 
-复制 `.env.example` 文件为 `.env.local`：
-
-```bash
-cp .env.example .env.local
-```
-
-在 `.env.local` 中填入你的令牌：
-
-```env
-VITE_BLOB_READ_WRITE_TOKEN=你的实际令牌
-```
-
-启动开发服务器：
+项目已配置好所有必要的环境变量，直接启动开发服务器：
 
 ```bash
 npm run dev
@@ -57,7 +54,8 @@ npm run dev
 
 1. 将代码推送到 GitHub
 2. 在 Vercel 中导入项目
-3. 在项目设置中配置环境变量 `BLOB_READ_WRITE_TOKEN`
+3. 在项目设置中配置以下环境变量：
+   - `BLOB_READ_WRITE_TOKEN`: `vercel_blob_rw_fmATeK5mFkUM5GBd_R1FA5xYcMGA6v7nYb64wRsoaQQu1cS`
 4. 部署项目
 
 ## 使用方法
@@ -92,6 +90,8 @@ vercel-blob-uploader/
 ├── src/
 │   ├── components/
 │   │   └── FileUploader.vue    # 文件上传组件
+│   ├── utils/
+│   │   └── blobConfig.js       # Blob 配置工具
 │   ├── App.vue                 # 主应用组件
 │   ├── main.js                 # 应用入口
 │   └── style.css               # 全局样式
@@ -100,6 +100,7 @@ vercel-blob-uploader/
 ├── vite.config.js              # Vite 配置
 ├── package.json                # 项目配置
 ├── .env.example                # 环境变量示例
+├── .env.local                  # 本地环境变量 (已配置)
 └── README.md                   # 项目说明
 ```
 
