@@ -129,6 +129,8 @@ import { put } from '@vercel/blob'
 
 // 设置 PDF.js worker - 使用本地文件
 pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`
+console.log('PDF.js 版本:', pdfjsLib.version)
+console.log('Worker 路径:', pdfjsLib.GlobalWorkerOptions.workerSrc)
 
 export default {
   name: 'PDFReader',
@@ -175,7 +177,7 @@ export default {
       try {
         const loadingTask = pdfjsLib.getDocument({
           url: props.pdfUrl,
-          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/cmaps/',
           cMapPacked: true
         })
 
