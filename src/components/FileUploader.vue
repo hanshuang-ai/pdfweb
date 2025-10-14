@@ -8,7 +8,8 @@
         <strong>存储信息:</strong>
         Store ID: {{ blobInfo.storeId }} |
         地区: {{ blobInfo.region }} |
-        状态: <span :style="{ color: blobInfo.status === '已配置' ? '#38a169' : '#e53e3e' }">{{ blobInfo.status }}</span>
+        模式: <span style="color: #667eea;">{{ blobInfo.mode }}</span> |
+        状态: <span :style="{ color: blobInfo.status.includes('已配置') ? '#38a169' : '#e53e3e' }">{{ blobInfo.status }}</span>
       </p>
     </div>
 
@@ -152,6 +153,85 @@ export default {
     const uploadFile = async () => {
       if (!selectedFile.value) return
 
+      uploading.value = true
+      error.value = ''
+      success.value = false
+      uploadProgress.value = 0
+
+      try {
+        // 生成唯一文件名
+        const filename = generateUniqueFilename(selectedFile.value)
+
+        // 步骤1: 从API获取上传URL
+        uploadProgress.value = 10
+        const response = await fetch('/api/upload-url', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            filename,
+            contentType: selectedFile.value.type || 'application/octet-stream'
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error(`获取上传URL失败: ${response.statusText}`)
+        }
+
+        const { uploadUrl, url } = await response.json()
+        uploadProgress.value = 30
+
+        // 步骤2: 直接上传文件到Blob存储
+        const formData = new FormData()
+        formData.append('file', selectedFile.value)
+
+        // 模拟上传进度
+        const progressInterval = setInterval(() => {
+          if (uploadProgress.value < 85) {
+            uploadProgress.value += Math.random() * 15
+          }
+        }, 200)
+
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: selectedFile.value,
+          headers: {
+            'Content-Type': selectedFile.value.type || 'application/octet-stream',
+          }
+        })
+
+        clearInterval(progressInterval)
+        uploadProgress.value = 100
+
+        if (!uploadResponse.ok) {
+          throw new Error(`文件上传失败: ${uploadResponse.statusText}`)
+        }
+
+        fileUrl.value = url
+        success.value = true
+
+        // 重置表单
+        setTimeout(() => {
+          selectedFile.value = null
+          if (fileInput.value) {
+            fileInput.value.value = ''
+          }
+        }, 2000)
+
+      } catch (err) {
+        console.error('上传错误:', err)
+        error.value = `上传失败: ${err.message || '未知错误'}`
+      } finally {
+        uploading.value = false
+      }
+    }
+
+    // === 原有客户端直传代码 (已注释) ===
+    /*
+    const uploadFileOld = async () => {
+      if (!selectedFile.value) return
+
       // 验证配置
       try {
         validateConfig()
@@ -176,7 +256,7 @@ export default {
           }
         }, 300)
 
-        // 上传文件到Vercel Blob
+        // 上传文件到Vercel Blob (客户端直传 - 可能遇到CORS问题)
         const blob = await put(filename, selectedFile.value, {
           ...blobConfig.uploadOptions,
           token: blobConfig.token,
@@ -203,6 +283,7 @@ export default {
         uploading.value = false
       }
     }
+    */
 
     return {
       fileInput,

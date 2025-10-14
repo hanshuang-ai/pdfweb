@@ -5,10 +5,10 @@ export const blobConfig = {
   region: import.meta.env.VITE_BLOB_REGION || 'hkg1',
   baseUrl: import.meta.env.VITE_BLOB_BASE_URL || 'https://fmatek5mfkum5gbd.public.blob.vercel-storage.com',
 
-  // 认证令牌
+  // 认证令牌 (可选，用于显示配置状态)
   token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN,
 
-  // 上传选项
+  // 上传选项 (用于显示信息，实际上传由API处理)
   uploadOptions: {
     access: 'public',
     addRandomSuffix: true,
@@ -26,8 +26,25 @@ export const generateUniqueFilename = (file) => {
   return `${timestamp}-${randomString}-${baseName}.${extension}`
 }
 
-// 验证配置
+// 验证配置 (新方案：只需要验证基本配置)
 export const validateConfig = () => {
+  const { storeId, baseUrl } = blobConfig
+
+  if (!storeId) {
+    throw new Error('缺少 BLOB_STORE_ID 环境变量')
+  }
+
+  if (!baseUrl) {
+    throw new Error('缺少 BLOB_BASE_URL 环境变量')
+  }
+
+  return true
+}
+
+// === 原有验证配置 (已注释) ===
+/*
+// 原有验证配置 (客户端直传方案)
+export const validateConfigOld = () => {
   const { token, storeId, baseUrl } = blobConfig
 
   if (!token) {
@@ -44,13 +61,29 @@ export const validateConfig = () => {
 
   return true
 }
+*/
 
-// 获取Blob存储信息
+// 获取Blob存储信息 (新方案：API代理)
 export const getBlobInfo = () => {
   return {
     storeId: blobConfig.storeId,
     region: blobConfig.region,
     baseUrl: blobConfig.baseUrl,
-    status: blobConfig.token ? '已配置' : '未配置'
+    status: 'API代理模式 (已配置)',
+    mode: 'API代理 (方案2)'
   }
 }
+
+// === 原有获取Blob存储信息 (已注释) ===
+/*
+// 原有获取Blob存储信息 (客户端直传)
+export const getBlobInfoOld = () => {
+  return {
+    storeId: blobConfig.storeId,
+    region: blobConfig.region,
+    baseUrl: blobConfig.baseUrl,
+    status: blobConfig.token ? '已配置' : '未配置',
+    mode: '客户端直传 (方案1)'
+  }
+}
+*/
