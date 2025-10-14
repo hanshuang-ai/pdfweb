@@ -127,8 +127,8 @@ import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 import { put } from '@vercel/blob'
 
-// 设置 PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+// 设置 PDF.js worker - 使用本地文件
+pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`
 
 export default {
   name: 'PDFReader',
