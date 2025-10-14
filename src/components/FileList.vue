@@ -223,8 +223,7 @@ export default {
 		const copyUrl = async (url) => {
 			try {
 				await navigator.clipboard.writeText(url);
-				// 这里可以添加一个toast提示，现在简单alert
-				alert("链接已复制到剪贴板！");
+				window.$toast.success("复制成功", "链接已复制到剪贴板！");
 			} catch (err) {
 				console.error("Failed to copy URL:", err);
 				// 降级方案：选中文本
@@ -234,7 +233,7 @@ export default {
 				textArea.select();
 				document.execCommand("copy");
 				document.body.removeChild(textArea);
-				alert("链接已复制到剪贴板！");
+				window.$toast.success("复制成功", "链接已复制到剪贴板！");
 			}
 		};
 
@@ -264,10 +263,10 @@ export default {
 
 				// 刷新文件列表
 				await fetchFileList();
-				alert("文件已成功删除！");
+				window.$toast.success("删除成功", "文件已成功删除！");
 			} catch (err) {
 				console.error("Failed to delete file:", err);
-				alert(`删除失败: ${err.message}`);
+				window.$toast.error("删除失败", `删除失败: ${err.message}`);
 			} finally {
 				deleting.value = false;
 			}

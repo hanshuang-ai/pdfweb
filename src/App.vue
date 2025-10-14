@@ -38,18 +38,23 @@
         <p>💖 基于 Vue 3 + Vercel Blob 构建</p>
       </div>
     </div>
+
+    <!-- Toast 通知组件 -->
+    <ToastNotification />
   </div>
 </template>
 
 <script>
 import FileUploader from './components/FileUploader.vue'
 import FileList from './components/FileList.vue'
+import ToastNotification from './components/ToastNotification.vue'
 
 export default {
   name: 'App',
   components: {
     FileUploader,
-    FileList
+    FileList,
+    ToastNotification
   },
   methods: {
     refreshFileList() {
