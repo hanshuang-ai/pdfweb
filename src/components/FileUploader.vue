@@ -24,7 +24,7 @@
       <div class="upload-icon">📁</div>
       <div class="upload-text">
         <p>点击选择文件或拖拽文件到此处</p>
-        <p style="font-size: 0.875rem; margin-top: 0.5rem;">支持所有文件类型</p>
+        <p style="font-size: 0.875rem; margin-top: 0.5rem;">支持所有文件类型 | 最大文件大小: 4.5MB</p>
       </div>
       <input
         ref="fileInput"
@@ -153,6 +153,13 @@ export default {
     const uploadFile = async () => {
       if (!selectedFile.value) return
 
+      // 检查文件大小 (Vercel免费版限制4.5MB)
+      const maxSize = 4.5 * 1024 * 1024 // 4.5MB
+      if (selectedFile.value.size > maxSize) {
+        error.value = `文件太大！最大支持 ${formatFileSize(maxSize)}，当前文件 ${formatFileSize(selectedFile.value.size)}`
+        return
+      }
+
       uploading.value = true
       error.value = ''
       success.value = false
@@ -169,20 +176,55 @@ export default {
           }
         }, 300)
 
-        // 直接上传文件到API端点 (方案1: 完全服务端处理)
+        // 转换文件为base64上传 (避免FormData解析问题)
         uploadProgress.value = 20
-        const formData = new FormData()
-        formData.append('file', selectedFile.value)
-        formData.append('filename', filename)
+
+        console.log('=== FRONTEND UPLOAD START ===');
+        console.log('Selected file:', selectedFile.value.name);
+        console.log('File size:', selectedFile.value.size);
+        console.log('File type:', selectedFile.value.type);
+        console.log('Generated filename:', filename);
+
+        const fileReader = new FileReader()
+        const base64Promise = new Promise((resolve, reject) => {
+          fileReader.onload = () => resolve(fileReader.result)
+          fileReader.onerror = reject
+        })
+        fileReader.readAsDataURL(selectedFile.value)
+
+        const base64Data = await base64Promise
+        console.log('File converted to base64, length:', base64Data.length);
 
         const response = await fetch('/api/upload', {
           method: 'POST',
-          body: formData
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            file: base64Data,
+            filename: filename,
+            originalName: selectedFile.value.name,
+            mimeType: selectedFile.value.type
+          })
         })
+        console.log('API response status:', response.status);
 
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.details || `上传失败: ${response.statusText}`)
+          let errorMessage = `上传失败: ${response.statusText}`
+
+          // 特殊处理413错误 (文件过大)
+          if (response.status === 413) {
+            errorMessage = '文件太大！请选择小于4.5MB的文件'
+          } else {
+            try {
+              const errorData = await response.json()
+              errorMessage = errorData.details || errorData.error || errorMessage
+            } catch (e) {
+              // 如果无法解析JSON，使用默认错误消息
+            }
+          }
+
+          throw new Error(errorMessage)
         }
 
         const { url } = await response.json()
