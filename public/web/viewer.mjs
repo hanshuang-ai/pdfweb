@@ -17490,6 +17490,9 @@ initCom(PDFViewerApplication);
 {
   const HOSTED_VIEWER_ORIGINS = new Set(["null", "http://mozilla.github.io", "https://mozilla.github.io"]);
   var validateFileURL = function (file) {
+    // 禁用源验证以允许加载跨域PDF文件
+    return;
+
     if (!file) {
       return;
     }
