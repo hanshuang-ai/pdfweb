@@ -126,10 +126,13 @@
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// 设置 PDF.js worker - 使用本地文件确保版本匹配
-const pdfjsVersion = pdfjsLib.version
-pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`
-console.log('PDF.js 版本:', pdfjsVersion)
+// 设置 PDF.js worker - 使用URL方式
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString()
+
+console.log('PDF.js 版本:', pdfjsLib.version)
 console.log('Worker 路径:', pdfjsLib.GlobalWorkerOptions.workerSrc)
 
 export default {
@@ -188,11 +191,8 @@ export default {
 
       try {
         console.log('创建PDF加载任务...')
-        const loadingTask = pdfjsLib.getDocument({
-          url: props.pdfUrl,
-          cMapUrl: '/cmaps/',
-          cMapPacked: true
-        })
+        // 使用最简单的配置，避免版本冲突
+        const loadingTask = pdfjsLib.getDocument(props.pdfUrl)
 
         loadingTask.onProgress = (progress) => {
           console.log('PDF加载进度:', progress)
