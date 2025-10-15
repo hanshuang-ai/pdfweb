@@ -275,8 +275,14 @@ export default {
       }
     }
 
-    // 生成缩略图
+    // 生成缩略图 - 暂时禁用以避免PDF.js版本问题
     const generateThumbnails = async () => {
+      console.log('缩略图功能暂时禁用，避免PDF.js版本兼容性问题')
+      // TODO: 在PDF.js版本稳定后重新启用
+      return
+
+      // 原始代码被注释，避免版本冲突
+      /*
       if (!pdfDocument.value) return
 
       await nextTick()
@@ -307,6 +313,7 @@ export default {
           console.error(`缩略图 ${pageNum} 生成失败:`, err)
         }
       }
+      */
     }
 
     // 页面导航
