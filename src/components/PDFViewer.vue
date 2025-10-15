@@ -160,10 +160,9 @@
 <script>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
-import PDFWorker from 'pdfjs-dist/build/pdf.worker?url'
 
-// 配置PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = PDFWorker
+// 配置PDF.js worker - 使用CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
 
 export default {
   name: 'PDFViewer',
@@ -224,9 +223,27 @@ export default {
         error.value = ''
         loadingProgress.value = 0
 
-        // 加载PDF文档
+        console.log('开始加载PDF:', props.pdfUrl)
+
+        // 配置PDF加载选项，支持CORS
         const loadingTask = pdfjsLib.getDocument({
           url: props.pdfUrl,
+          cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+          standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/',
+          disableAutoFetch: false,
+          enableXfa: true,
+          onProgress: (progress) => {
+            if (progress.total) {
+              loadingProgress.value = Math.round((progress.loaded / progress.total) * 100)
+              console.log('加载进度:', loadingProgress.value + '%')
+            }
+          },
+          onPassword: (callback, reason) => {
+            // 如果PDF有密码保护
+            console.warn('PDF需要密码:', reason)
+            error.value = '该PDF文件需要密码保护，暂不支持'
+            isLoading.value = false
+          },
           onProgress: (progress) => {
             if (progress.total) {
               loadingProgress.value = Math.round((progress.loaded / progress.total) * 100)
@@ -234,7 +251,10 @@ export default {
           }
         })
 
+        // 等待PDF文档加载
         pdfDocument.value = await loadingTask.promise
+        console.log('PDF加载成功，总页数:', pdfDocument.value.numPages)
+
         totalPages.value = pdfDocument.value.numPages
         currentPage.value = 1
         currentPageInput.value = 1
@@ -249,7 +269,21 @@ export default {
 
       } catch (err) {
         console.error('PDF加载失败:', err)
-        error.value = `PDF加载失败: ${err.message || '未知错误'}`
+        let errorMessage = 'PDF加载失败'
+
+        if (err.name === 'InvalidPDFException') {
+          errorMessage = '无效的PDF文件'
+        } else if (err.name === 'MissingPDFException') {
+          errorMessage = 'PDF文件未找到或无法访问'
+        } else if (err.name === 'UnexpectedResponseException') {
+          errorMessage = '服务器返回错误响应，请检查PDF链接'
+        } else if (err.message && err.message.includes('CORS')) {
+          errorMessage = '跨域访问被阻止，请检查服务器CORS配置'
+        } else if (err.message) {
+          errorMessage = `PDF加载失败: ${err.message}`
+        }
+
+        error.value = errorMessage
         emit('error', error.value)
       } finally {
         isLoading.value = false
@@ -259,32 +293,43 @@ export default {
 
     // 渲染指定页面
     const renderPage = async (pageNum) => {
-      if (!pdfDocument.value || !pdfCanvas.value) return
+      if (!pdfDocument.value || !pdfCanvas.value) {
+        console.error('PDF文档或Canvas未准备就绪')
+        return
+      }
 
       try {
+        console.log(`开始渲染第 ${pageNum} 页`)
+
         // 获取页面
         const page = await pdfDocument.value.getPage(pageNum)
+        console.log(`成功获取第 ${pageNum} 页`)
 
         // 计算缩放比例
         let scale = currentScale.value
         if (scale === 'auto') {
-          const containerWidth = pdfContainer.value.clientWidth - 40
+          const containerWidth = pdfContainer.value ? pdfContainer.value.clientWidth - 40 : 800
           const viewport = page.getViewport({ scale: 1.0 })
           scale = containerWidth / viewport.width
           currentScale.value = scale
+          console.log(`自动缩放比例: ${scale}`)
         } else if (scale === 'page-fit') {
-          const containerHeight = pdfContainer.value.clientHeight - 100
-          const containerWidth = pdfContainer.value.clientWidth - 40
+          const containerHeight = pdfContainer.value ? pdfContainer.value.clientHeight - 100 : 600
+          const containerWidth = pdfContainer.value ? pdfContainer.value.clientWidth - 40 : 800
           const viewport = page.getViewport({ scale: 1.0 })
           const scaleX = containerWidth / viewport.width
           const scaleY = containerHeight / viewport.height
           scale = Math.min(scaleX, scaleY)
           currentScale.value = scale
+          console.log(`适合页面缩放比例: ${scale}`)
         } else if (scale === 'page-width') {
-          const containerWidth = pdfContainer.value.clientWidth - 40
+          const containerWidth = pdfContainer.value ? pdfContainer.value.clientWidth - 40 : 800
           const viewport = page.getViewport({ scale: 1.0 })
           scale = containerWidth / viewport.width
           currentScale.value = scale
+          console.log(`适合宽度缩放比例: ${scale}`)
+        } else {
+          console.log(`使用固定缩放比例: ${scale}`)
         }
 
         // 创建视口
@@ -293,19 +338,34 @@ export default {
           rotation: rotation.value
         })
 
+        console.log(`视口尺寸: ${viewport.width} x ${viewport.height}`)
+
         // 设置canvas尺寸
         const canvas = pdfCanvas.value
         const context = canvas.getContext('2d')
-        canvas.height = viewport.height
-        canvas.width = viewport.width
+
+        // 设置canvas实际尺寸
+        const devicePixelRatio = window.devicePixelRatio || 1
+        canvas.style.width = viewport.width + 'px'
+        canvas.style.height = viewport.height + 'px'
+        canvas.width = viewport.width * devicePixelRatio
+        canvas.height = viewport.height * devicePixelRatio
+
+        // 缩放context以适应设备像素比
+        context.scale(devicePixelRatio, devicePixelRatio)
+
+        console.log(`Canvas尺寸设置完成`)
 
         // 渲染PDF页面
         const renderContext = {
           canvasContext: context,
-          viewport: viewport
+          viewport: viewport,
+          enableWebGL: false
         }
 
+        console.log(`开始渲染页面...`)
         await page.render(renderContext).promise
+        console.log(`第 ${pageNum} 页渲染完成`)
 
         // 渲染文本层
         await renderTextLayer(page, viewport)
@@ -318,7 +378,14 @@ export default {
 
       } catch (err) {
         console.error('页面渲染失败:', err)
-        error.value = `页面渲染失败: ${err.message || '未知错误'}`
+        let errorMessage = `页面渲染失败`
+
+        if (err.message) {
+          errorMessage += `: ${err.message}`
+        }
+
+        error.value = errorMessage
+        emit('error', error.value)
       }
     }
 

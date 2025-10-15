@@ -93,8 +93,8 @@ export default {
     const route = useRoute()
     const router = useRouter()
 
-    // 默认示例PDF
-    const defaultUrl = 'https://fmatek5mfkum5gbd.public.blob.vercel-storage.com/1760506598654-5481ozc9d8m-1.JavaScript%E9%AB%98%E7%BA%A7%E7%A8%8B%E5%BA%8F%E8%AE%BE%E8%AE%A1%EF%BC%88%E7%AC%AC4%E7%89%88%EF%BC%89%5B%E5%89%8D%E7%AB%AF%E8%83%96%E5%A4%B4%E9%B1%BC%5D.pdf'
+    // 默认示例PDF - 使用用户提供的链接
+    const defaultUrl = 'https://www.pwithe.com/Public/Upload/download/20170211/589ebf8e5bb13.pdf'
 
     // 从路由参数获取URL和文件名
     const initial = route.query.url || defaultUrl
