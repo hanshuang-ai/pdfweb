@@ -248,20 +248,11 @@ export default {
 			}
 		};
 
-		const editPDF = (file) => {
-			// 构建编辑页面 URL 参数
-			const fileData = {
-				url: file.url,
-				name: file.originalName,
-				pathname: file.pathname
-			};
-
-			const params = encodeURIComponent(JSON.stringify(fileData));
-			const editorUrl = `/editor?file=${params}`;
-
-			// 使用 Vue Router 进行导航
-			router.push(editorUrl);
-		};
+    const editPDF = (file) => {
+      // 跳转到浏览器内置阅读器页面，并打开该文件链接
+      const encodedUrl = encodeURIComponent(file.url);
+      router.push(`/browser-viewer?url=${encodedUrl}`);
+    };
 
 		const deleteFile = async (pathname) => {
 			// 获取文件名用于显示

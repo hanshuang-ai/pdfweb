@@ -68,18 +68,18 @@
 import { ref } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// 设置 PDF.js worker - 添加版本号防止缓存问题（与PDFReader保持一致）
-const workerUrl = `/pdf.worker.min.js?v=${pdfjsLib.version}`
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
+// 使用经典脚本 Worker 初始化 PDF.js（确保路径存在且与当前版本兼容）
+const pdfWorker = new Worker(new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url))
+pdfjsLib.GlobalWorkerOptions.workerPort = pdfWorker
 
 console.log('SimplePDFTest - PDF.js 版本:', pdfjsLib.version)
-console.log('SimplePDFTest - Worker 路径:', pdfjsLib.GlobalWorkerOptions.workerSrc)
+console.log('SimplePDFTest - 使用模块 Worker 初始化')
 
 export default {
   name: 'SimplePDFTest',
   setup() {
-    // 设置默认PDF URL
-    const defaultPdfUrl = 'https://fmatek5mfkum5gbd.public.blob.vercel-storage.com/1760506598654-5481ozc9d8m-1.JavaScript%E9%AB%98%E7%BA%A7%E7%A8%8B%E5%BA%8F%E8%AE%BE%E8%AE%A1%EF%BC%88%E7%AC%AC4%E7%89%88%EF%BC%89%5B%E5%89%8D%E7%AB%AF%E8%83%96%E5%A4%B4%E9%B1%BC%5D.pdf'
+    // 设置默认PDF URL（使用本地测试文件）
+    const defaultPdfUrl = '/test.pdf'
 
     const testUrl = ref(defaultPdfUrl)
     const loading = ref(false)
@@ -132,21 +132,6 @@ export default {
       } finally {
         loading.value = false
       }
-    }
-
-    return {
-      testUrl,
-      loading,
-      error,
-      result,
-      testCanvas,
-      currentPage,
-      currentPageInput,
-      testPDF,
-      renderPage,
-      previousPage,
-      nextPage,
-      goToPage
     }
 
     // 渲染指定页面
@@ -236,6 +221,21 @@ export default {
         currentPageInput.value = pageNum
         renderPage(pageNum)
       }
+    }
+
+    return {
+      testUrl,
+      loading,
+      error,
+      result,
+      testCanvas,
+      currentPage,
+      currentPageInput,
+      testPDF,
+      renderPage,
+      previousPage,
+      nextPage,
+      goToPage
     }
   },
   mounted() {
