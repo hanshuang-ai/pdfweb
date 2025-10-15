@@ -1,90 +1,79 @@
 <template>
-  <div class="pdf-viewer" :class="{ 'fullscreen': isFullscreen }">
-    <!-- 浮动工具栏 -->
-    <div class="floating-toolbar" :class="{ 'toolbar-hidden': isFullscreen && !showToolbar }">
-      <div class="toolbar-content">
-        <!-- 左侧操作区 -->
-        <div class="toolbar-left">
-          <button @click="goBack" class="toolbar-btn back-btn" title="返回文件列表">
-            <span class="btn-icon">←</span>
-            <span class="btn-text">返回</span>
-          </button>
-          <div class="file-info" v-if="fileName">
-            <span class="file-name">{{ fileName }}</span>
+  <div class="pdf-viewer-wrapper">
+    <!-- 简化的顶部工具栏 -->
+    <div class="top-toolbar" v-if="!isUsingPDFJS">
+      <button @click="goBack" class="back-btn" title="返回文件列表">
+        <span class="btn-icon">←</span>
+        <span class="btn-text">返回</span>
+      </button>
+      <div class="file-info" v-if="fileName">
+        <span class="file-name">{{ fileName }}</span>
+      </div>
+      <div class="toolbar-spacer"></div>
+      <button @click="toggleViewer" class="toggle-viewer-btn" :title="isUsingPDFJS ? '切换到浏览器模式' : '切换到PDF.js模式'">
+        <span class="btn-icon">{{ isUsingPDFJS ? '🌐' : '📄' }}</span>
+        <span class="btn-text">{{ isUsingPDFJS ? '浏览器模式' : 'PDF.js模式' }}</span>
+      </button>
+      <input
+        v-if="!isUsingPDFJS"
+        v-model="url"
+        @keyup.enter="loadNewURL"
+        placeholder="输入PDF链接..."
+        class="url-input"
+      />
+    </div>
+
+    <!-- PDF.js查看器 -->
+    <PDFViewer
+      v-if="isUsingPDFJS"
+      :pdf-url="url"
+      :file-name="fileName"
+      :initial-scale="initialScale"
+      @pdf-loaded="onPDFLoaded"
+      @page-changed="onPageChanged"
+      @scale-changed="onScaleChanged"
+      @error="onPDFError"
+    />
+
+    <!-- 浏览器iframe查看器 -->
+    <div v-else class="browser-viewer">
+      <div class="pdf-container" @click="handleContainerClick">
+        <!-- PDF iframe -->
+        <div class="pdf-frame-wrapper">
+          <iframe
+            :src="pdfUrl"
+            class="pdf-frame"
+            ref="iframeRef"
+            @load="onIframeLoad"
+            @error="onIframeError"
+          ></iframe>
+
+          <!-- 加载状态 -->
+          <div v-if="loading" class="loading-overlay">
+            <div class="loading-spinner">⏳</div>
+            <div class="loading-text">正在加载PDF...</div>
+          </div>
+
+          <!-- 错误状态 -->
+          <div v-if="error" class="error-overlay">
+            <div class="error-icon">❌</div>
+            <div class="error-text">PDF加载失败</div>
+            <div class="error-message">{{ error }}</div>
+            <button @click="retryLoad" class="retry-btn">重试</button>
           </div>
         </div>
-
-        <!-- 中间控制区 -->
-        <div class="toolbar-center">
-          <button @click="toggleFullscreen" class="toolbar-btn fullscreen-btn" :title="isFullscreen ? '退出全屏' : '进入全屏'">
-            <span class="btn-icon">{{ isFullscreen ? '⛶' : '⛶' }}</span>
-            <span class="btn-text">{{ isFullscreen ? '退出全屏' : '全屏' }}</span>
-          </button>
-          <button @click="refreshPDF" class="toolbar-btn refresh-btn" title="刷新PDF">
-            <span class="btn-icon">↻</span>
-            <span class="btn-text">刷新</span>
-          </button>
-          <button @click="openNewTab" class="toolbar-btn new-tab-btn" title="在新标签打开">
-            <span class="btn-icon">⎘</span>
-            <span class="btn-text">新标签</span>
-          </button>
-        </div>
-
-        <!-- 右侧地址区 -->
-        <div class="toolbar-right">
-          <input
-            v-model="url"
-            @keyup.enter="loadNewURL"
-            placeholder="输入PDF链接..."
-            class="url-input"
-          />
-        </div>
       </div>
     </div>
 
-    <!-- PDF显示区域 -->
-    <div class="pdf-container" @click="handleContainerClick">
-      <!-- 全屏模式下的工具栏触发区域 -->
-      <div v-if="isFullscreen" class="fullscreen-trigger" @click="toggleToolbar">
-        <div class="trigger-hint">点击显示/隐藏工具栏</div>
+    <!-- PDF.js模式下的状态栏 -->
+    <div class="status-bar" v-if="isUsingPDFJS && pdfStatus.pageNum">
+      <div class="status-left">
+        <span>第 {{ pdfStatus.pageNum }} 页 / 共 {{ pdfStatus.totalPages }} 页</span>
+        <span class="separator">|</span>
+        <span>缩放: {{ Math.round(pdfStatus.scale * 100) }}%</span>
       </div>
-
-      <!-- PDF iframe -->
-      <div class="pdf-frame-wrapper" :class="{ 'fullscreen-frame': isFullscreen }">
-        <iframe
-          :src="pdfUrl"
-          class="pdf-frame"
-          ref="iframeRef"
-          @load="onIframeLoad"
-          @error="onIframeError"
-        ></iframe>
-
-        <!-- 加载状态 -->
-        <div v-if="loading" class="loading-overlay">
-          <div class="loading-spinner">⏳</div>
-          <div class="loading-text">正在加载PDF...</div>
-        </div>
-
-        <!-- 错误状态 -->
-        <div v-if="error" class="error-overlay">
-          <div class="error-icon">❌</div>
-          <div class="error-text">PDF加载失败</div>
-          <div class="error-message">{{ error }}</div>
-          <button @click="retryLoad" class="retry-btn">重试</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 快捷键提示 -->
-    <div v-if="isFullscreen" class="shortcuts-hint">
-      <div class="hint-item">
-        <kbd>F11</kbd> 全屏/退出
-      </div>
-      <div class="hint-item">
-        <kbd>Esc</kbd> 退出全屏
-      </div>
-      <div class="hint-item">
-        <kbd>F5</kbd> 刷新
+      <div class="status-right">
+        <span v-if="fileName">{{ fileName }}</span>
       </div>
     </div>
   </div>
@@ -93,9 +82,13 @@
 <script>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import PDFViewer from './PDFViewer.vue'
 
 export default {
   name: 'BrowserPDF',
+  components: {
+    PDFViewer
+  },
   setup() {
     const route = useRoute()
     const router = useRouter()
@@ -110,92 +103,42 @@ export default {
     // 响应式数据
     const url = ref(initial)
     const iframeRef = ref(null)
-    const isFullscreen = ref(false)
-    const showToolbar = ref(true)
     const loading = ref(false)
     const error = ref('')
-    const toolbarTimer = ref(null)
+    const isUsingPDFJS = ref(true) // 默认使用PDF.js
+    const initialScale = ref('page-width')
 
-    // 计算属性 - PDF URL (添加时间戳避免缓存)
+    // PDF.js状态
+    const pdfStatus = ref({
+      pageNum: 0,
+      totalPages: 0,
+      scale: 1
+    })
+
+    // 计算属性 - PDF URL (用于iframe模式)
     const pdfUrl = computed(() => {
       const timestamp = new Date().getTime()
       return `${url.value}#toolbar=0&navpanes=0&scrollbar=0&t=${timestamp}`
     })
 
-    // 全屏切换
-    const toggleFullscreen = () => {
-      if (!document.fullscreenElement) {
-        enterFullscreen()
-      } else {
-        exitFullscreen()
+    // 切换查看器
+    const toggleViewer = () => {
+      isUsingPDFJS.value = !isUsingPDFJS.value
+      if (!isUsingPDFJS.value) {
+        loading.value = true
       }
     }
 
-    // 进入全屏
-    const enterFullscreen = () => {
-      const element = document.documentElement
-      if (element.requestFullscreen) {
-        element.requestFullscreen()
-      } else if (element.webkitRequestFullscreen) {
-        element.webkitRequestFullscreen()
-      } else if (element.msRequestFullscreen) {
-        element.msRequestFullscreen()
-      }
-    }
-
-    // 退出全屏
-    const exitFullscreen = () => {
-      if (document.exitFullscreen) {
-        document.exitFullscreen()
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen()
-      } else if (document.msExitFullscreen) {
-        document.msExitFullscreen()
-      }
-    }
-
-    // 切换工具栏显示
-    const toggleToolbar = () => {
-      showToolbar.value = !showToolbar.value
-
-      // 自动隐藏工具栏
-      if (showToolbar.value) {
-        clearTimeout(toolbarTimer.value)
-        toolbarTimer.value = setTimeout(() => {
-          if (isFullscreen.value) {
-            showToolbar.value = false
-          }
-        }, 5000)
-      }
-    }
-
-    // 显示工具栏
-    const showToolbarTemporarily = () => {
-      if (isFullscreen.value) {
-        showToolbar.value = true
-        clearTimeout(toolbarTimer.value)
-        toolbarTimer.value = setTimeout(() => {
-          showToolbar.value = false
-        }, 3000)
-      }
-    }
-
-    // 处理容器点击
+    // 处理容器点击（浏览器模式）
     const handleContainerClick = (event) => {
-      if (isFullscreen.value) {
-        // 如果点击的不是按钮或输入框，则切换工具栏
-        if (!event.target.closest('.toolbar-btn') && !event.target.closest('.url-input')) {
-          toggleToolbar()
-        }
-      }
+      // 在浏览器模式下可以添加一些交互逻辑
     }
 
-    // 刷新PDF
+    // 刷新PDF（浏览器模式）
     const refreshPDF = () => {
       loading.value = true
       error.value = ''
       if (iframeRef.value) {
-        // 强制重新加载iframe
         const currentSrc = iframeRef.value.src
         iframeRef.value.src = ''
         setTimeout(() => {
@@ -213,11 +156,6 @@ export default {
       }
     }
 
-    // 在新标签打开
-    const openNewTab = () => {
-      window.open(url.value, '_blank')
-    }
-
     // 返回
     const goBack = () => {
       router.push('/')
@@ -226,7 +164,11 @@ export default {
     // 重试加载
     const retryLoad = () => {
       error.value = ''
-      refreshPDF()
+      if (isUsingPDFJS.value) {
+        // PDF.js模式会自动重试
+      } else {
+        refreshPDF()
+      }
     }
 
     // iframe加载完成
@@ -241,70 +183,37 @@ export default {
       error.value = '无法加载PDF文件，请检查链接是否正确'
     }
 
-    // 监听全屏变化
-    const handleFullscreenChange = () => {
-      isFullscreen.value = !!document.fullscreenElement
-      if (!isFullscreen.value) {
-        showToolbar.value = true
-        clearTimeout(toolbarTimer.value)
-      } else {
-        // 进入全屏时，3秒后自动隐藏工具栏
-        toolbarTimer.value = setTimeout(() => {
-          showToolbar.value = false
-        }, 3000)
-      }
+    // PDF.js事件处理
+    const onPDFLoaded = (data) => {
+      console.log('PDF加载完成:', data)
+      pdfStatus.value.totalPages = data.totalPages
     }
 
-    // 键盘快捷键
-    const handleKeydown = (event) => {
-      switch (event.key) {
-        case 'F11':
-          event.preventDefault()
-          toggleFullscreen()
-          break
-        case 'Escape':
-          if (isFullscreen.value) {
-            exitFullscreen()
-          }
-          break
-        case 'F5':
-          event.preventDefault()
-          refreshPDF()
-          break
-      }
+    const onPageChanged = (data) => {
+      pdfStatus.value.pageNum = data.pageNum
+      pdfStatus.value.totalPages = data.totalPages
+    }
+
+    const onScaleChanged = (scale) => {
+      pdfStatus.value.scale = scale
+    }
+
+    const onPDFError = (errorMessage) => {
+      error.value = errorMessage
     }
 
     // 组件挂载
     onMounted(() => {
       // 设置初始状态
-      loading.value = true
+      if (!isUsingPDFJS.value) {
+        loading.value = true
+      }
 
       // 更新页面标题
       if (fileName) {
         document.title = `${fileName} - PDF查看器`
       } else {
         document.title = 'PDF查看器 - 文件阅读管理'
-      }
-
-      // 添加事件监听
-      document.addEventListener('fullscreenchange', handleFullscreenChange)
-      document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
-      document.addEventListener('keydown', handleKeydown)
-      document.addEventListener('mousemove', showToolbarTemporarily)
-    })
-
-    // 组件卸载
-    onUnmounted(() => {
-      // 清理事件监听和定时器
-      document.removeEventListener('fullscreenchange', handleFullscreenChange)
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
-      document.removeEventListener('keydown', handleKeydown)
-      document.removeEventListener('mousemove', showToolbarTemporarily)
-      clearTimeout(toolbarTimer.value)
-
-      // 退出全屏模式
-      if (document.fullscreenElement) {
-        exitFullscreen()
       }
     })
 
@@ -313,23 +222,26 @@ export default {
       url,
       fileName,
       iframeRef,
-      isFullscreen,
-      showToolbar,
       loading,
       error,
+      isUsingPDFJS,
+      initialScale,
+      pdfStatus,
       pdfUrl,
 
       // 方法
-      toggleFullscreen,
-      toggleToolbar,
+      toggleViewer,
       handleContainerClick,
       refreshPDF,
       loadNewURL,
-      openNewTab,
       goBack,
       retryLoad,
       onIframeLoad,
-      onIframeError
+      onIframeError,
+      onPDFLoaded,
+      onPageChanged,
+      onScaleChanged,
+      onPDFError
     }
   }
 }
@@ -337,141 +249,48 @@ export default {
 
 <style scoped>
 /* 主容器 */
-.pdf-viewer {
+.pdf-viewer-wrapper {
   position: relative;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: #1a1a1a;
-  overflow: hidden;
-  transition: all 0.3s ease;
 }
 
-.pdf-viewer.fullscreen {
-  background: #000;
-}
-
-/* 浮动工具栏 */
-.floating-toolbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
-  transform: translateY(0);
-}
-
-.floating-toolbar.toolbar-hidden {
-  transform: translateY(-100%);
-}
-
-.toolbar-content {
+/* 顶部工具栏 */
+.top-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
   padding: 12px 20px;
-  gap: 20px;
-  max-width: 100%;
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+  z-index: 100;
 }
 
-/* 工具栏区域布局 */
-.toolbar-left,
-.toolbar-center,
-.toolbar-right {
+.back-btn {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.toolbar-left {
-  flex: 0 0 auto;
-}
-
-.toolbar-center {
-  flex: 0 0 auto;
-}
-
-.toolbar-right {
-  flex: 1;
-  max-width: 400px;
-}
-
-/* 文件信息 */
-.file-info {
-  display: flex;
-  align-items: center;
-}
-
-.file-name {
-  font-weight: 600;
-  color: #1f2937;
-  font-size: 14px;
-  max-width: 250px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 工具栏按钮 */
-.toolbar-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 8px;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.toolbar-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.back-btn {
-  background: #6c757d;
-  color: white;
 }
 
 .back-btn:hover {
-  background: #5a6268;
-}
-
-.fullscreen-btn {
-  background: #10b981;
-  color: white;
-}
-
-.fullscreen-btn:hover {
-  background: #059669;
-}
-
-.refresh-btn {
-  background: #3b82f6;
-  color: white;
-}
-
-.refresh-btn:hover {
-  background: #2563eb;
-}
-
-.new-tab-btn {
-  background: #8b5cf6;
-  color: white;
-}
-
-.new-tab-btn:hover {
-  background: #7c3aed;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .btn-icon {
@@ -482,68 +301,83 @@ export default {
   font-size: 13px;
 }
 
+/* 文件信息 */
+.file-info {
+  flex-shrink: 0;
+}
+
+.file-name {
+  font-weight: 600;
+  color: white;
+  font-size: 14px;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* 切换查看器按钮 */
+.toggle-viewer-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: #10b981;
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.toggle-viewer-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
 /* URL输入框 */
 .url-input {
-  flex: 1;
   padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
   font-size: 14px;
-  background: white;
-  color: #1f2937;
+  width: 300px;
   transition: all 0.2s ease;
 }
 
 .url-input:focus {
   outline: none;
   border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
 }
 
 .url-input::placeholder {
-  color: #9ca3af;
+  color: rgba(255, 255, 255, 0.6);
 }
 
-/* PDF容器 */
-.pdf-container {
+/* 浏览器查看器 */
+.browser-viewer {
+  flex: 1;
   position: relative;
-  width: 100%;
-  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-container {
+  flex: 1;
+  position: relative;
   background: #000;
 }
 
-/* 全屏触发区域 */
-.fullscreen-trigger {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-
-.pdf-container:hover .fullscreen-trigger {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.trigger-hint {
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.trigger-hint:hover {
-  background: rgba(0, 0, 0, 0.9);
-}
-
-/* PDF框架包装器 */
 .pdf-frame-wrapper {
   position: relative;
   width: 100%;
@@ -553,22 +387,11 @@ export default {
   justify-content: center;
 }
 
-.pdf-frame-wrapper.fullscreen-frame {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
-}
-
-/* PDF iframe */
 .pdf-frame {
   width: 100%;
   height: 100%;
   border: none;
   background: white;
-  border-radius: 0;
 }
 
 /* 加载状态 */
@@ -626,7 +449,7 @@ export default {
 }
 
 .error-message {
-  color: #7f1d1d;
+  color: rgba(255, 255, 255, 0.8);
   font-size: 14px;
   margin-bottom: 20px;
   max-width: 400px;
@@ -634,11 +457,11 @@ export default {
 }
 
 .retry-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
   background: #dc2626;
   color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -650,36 +473,37 @@ export default {
   transform: translateY(-1px);
 }
 
-/* 快捷键提示 */
-.shortcuts-hint {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: 16px;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.hint-item {
+/* 状态栏 */
+.status-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: white;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  flex-shrink: 0;
 }
 
-.hint-item kbd {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.separator {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.status-right {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 动画 */
@@ -692,88 +516,61 @@ export default {
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .toolbar-content {
-    padding: 8px 12px;
-    gap: 8px;
+  .top-toolbar {
     flex-wrap: wrap;
+    gap: 12px;
+    padding: 8px 12px;
   }
 
-  .toolbar-left,
-  .toolbar-center,
-  .toolbar-right {
-    gap: 8px;
-  }
-
-  .toolbar-right {
-    order: 3;
-    flex-basis: 100%;
-    max-width: none;
-    margin-top: 4px;
-  }
-
-  .file-name {
-    max-width: 120px;
-    font-size: 12px;
-  }
-
-  .btn-text {
+  .back-btn .btn-text,
+  .toggle-viewer-btn .btn-text {
     display: none;
   }
 
-  .toolbar-btn {
-    padding: 8px 10px;
+  .file-name {
+    max-width: 150px;
+    font-size: 12px;
   }
 
-  .btn-icon {
-    font-size: 14px;
+  .url-input {
+    width: 200px;
+    font-size: 13px;
   }
 
-  .shortcuts-hint {
-    bottom: 10px;
-    right: 10px;
-    padding: 12px;
-  }
-
-  .hint-item {
+  .status-bar {
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 12px;
     font-size: 11px;
+  }
+
+  .status-left {
+    gap: 8px;
   }
 }
 
 @media (max-width: 480px) {
-  .toolbar-content {
-    padding: 6px 8px;
+  .top-toolbar {
+    gap: 8px;
   }
 
-  .toolbar-left {
-    order: 1;
+  .back-btn,
+  .toggle-viewer-btn {
+    padding: 6px 10px;
   }
 
-  .toolbar-center {
-    order: 2;
-    margin-left: auto;
-  }
-
-  .toolbar-right {
-    order: 3;
-    margin-top: 8px;
+  .file-name {
+    max-width: 100px;
+    font-size: 11px;
   }
 
   .url-input {
-    font-size: 13px;
-    padding: 6px 10px;
+    width: 100%;
+    order: 3;
+    flex-basis: 100%;
+    margin-top: 4px;
   }
 
   .loading-spinner {
@@ -795,40 +592,5 @@ export default {
   .error-message {
     font-size: 12px;
   }
-}
-
-/* 全屏模式下的特殊样式 */
-.pdf-viewer.fullscreen .floating-toolbar {
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(20px);
-}
-
-.pdf-viewer.fullscreen .toolbar-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.pdf-viewer.fullscreen .toolbar-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.pdf-viewer.fullscreen .file-name {
-  color: white;
-}
-
-.pdf-viewer.fullscreen .url-input {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-.pdf-viewer.fullscreen .url-input::placeholder {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.pdf-viewer.fullscreen .url-input:focus {
-  border-color: rgba(255, 255, 255, 0.4);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
 }
 </style>
