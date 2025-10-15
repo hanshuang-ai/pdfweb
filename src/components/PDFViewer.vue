@@ -1,127 +1,51 @@
 <template>
-  <div class="simple-pdf-viewer">
-    <div v-if="loading" class="loading">
-      加载中...
-    </div>
-    <div v-if="error" class="error">
-      {{ error }}
-    </div>
-    <div class="pdf-container">
-      <canvas ref="canvasRef" class="pdf-canvas"></canvas>
-    </div>
+  <div class="pdf-viewer-container">
+    <iframe
+      ref="pdfFrame"
+      :src="viewerUrl"
+      class="pdf-iframe"
+      @load="onIframeLoad"
+    ></iframe>
   </div>
 </template>
 
-<script>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import * as pdfjsLib from 'pdfjs-dist'
+<script setup>
+import { ref, onMounted, computed } from 'vue'
 
-// 配置PDF.js worker - 使用本地文件
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/src/static/pdf.worker.min.js'
+const pdfFrame = ref(null)
+const isLoaded = ref(false)
 
-export default {
-  name: 'SimplePDFViewer',
-  setup() {
-    const route = useRoute()
+// PDF URL
+const pdfUrl = 'https://fmatek5mfkum5gbd.public.blob.vercel-storage.com/1760518485116-09vp3lkeeri-1.JavaScript%E9%AB%98%E7%BA%A7%E7%A8%8B%E5%BA%8F%E8%AE%BE%E8%AE%A1%EF%BC%88%E7%AC%AC4%E7%89%88%EF%BC%89%5B%E5%89%8D%E7%AB%AF%E8%83%96%E5%A4%B4%E9%B1%BC%5D.pdf'
 
-    // 从路由参数获取URL，如果没有则使用默认URL
-    const defaultUrl = 'https://www.pwithe.com/Public/Upload/download/20170211/589ebf8e5bb13.pdf'
-    const pdfUrl = route.query.url || defaultUrl
+// 构建viewer URL，包含PDF文件参数
+const viewerUrl = computed(() => {
+  const encodedPdfUrl = encodeURIComponent(pdfUrl)
+  return `/web/viewer.html?file=${encodedPdfUrl}`
+})
 
-    const canvasRef = ref(null)
-    const loading = ref(true)
-    const error = ref('')
-    const pdfDocument = ref(null)
-
-    const loadPDF = async () => {
-      try {
-        loading.value = true
-        error.value = ''
-
-        const loadingTask = pdfjsLib.getDocument(pdfUrl)
-        pdfDocument.value = await loadingTask.promise
-
-        await renderPage(1)
-        loading.value = false
-      } catch (err) {
-        error.value = 'PDF加载失败: ' + err.message
-        loading.value = false
-        console.error('PDF加载错误:', err)
-      }
-    }
-
-    const renderPage = async (pageNum) => {
-      try {
-        const page = await pdfDocument.value.getPage(pageNum)
-        const viewport = page.getViewport({ scale: 1.5 })
-
-        const canvas = canvasRef.value
-        const context = canvas.getContext('2d')
-
-        canvas.height = viewport.height
-        canvas.width = viewport.width
-
-        const renderContext = {
-          canvasContext: context,
-          viewport: viewport
-        }
-
-        await page.render(renderContext).promise
-        console.log(`第 ${pageNum} 页渲染完成`)
-      } catch (err) {
-        console.error('页面渲染错误:', err)
-        error.value = '页面渲染失败: ' + err.message
-      }
-    }
-
-    onMounted(() => {
-      loadPDF()
-    })
-
-    return {
-      canvasRef,
-      loading,
-      error
-    }
-  }
+const onIframeLoad = () => {
+  isLoaded.value = true
+  console.log('PDF viewer loaded successfully')
 }
+
+onMounted(() => {
+  console.log('PDFViewer component mounted')
+})
 </script>
 
 <style scoped>
-.simple-pdf-viewer {
+.pdf-viewer-container {
   width: 100%;
   height: 100vh;
-  background: #f5f5f5;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  position: relative;
 }
 
-.loading {
-  font-size: 18px;
-  color: #666;
-}
-
-.error {
-  color: red;
-  font-size: 16px;
-  text-align: center;
-  max-width: 500px;
-}
-
-.pdf-container {
-  max-width: 100%;
-  max-height: 100vh;
-  overflow: auto;
-  background: white;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.pdf-canvas {
-  display: block;
-  max-width: 100%;
-  height: auto;
+.pdf-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 </style>

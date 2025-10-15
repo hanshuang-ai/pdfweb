@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/WTCL/Desktop/DailyTesting/vercel-blob-uploader/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
