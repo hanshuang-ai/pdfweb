@@ -126,9 +126,10 @@
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// 设置 PDF.js worker - 使用本地文件
-pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`
-console.log('PDF.js 版本:', pdfjsLib.version)
+// 设置 PDF.js worker - 使用CDN确保版本匹配
+const pdfjsVersion = pdfjsLib.version
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsVersion}/build/pdf.worker.min.js`
+console.log('PDF.js 版本:', pdfjsVersion)
 console.log('Worker 路径:', pdfjsLib.GlobalWorkerOptions.workerSrc)
 
 export default {
@@ -149,6 +150,12 @@ export default {
   },
   emits: ['close'],
   setup(props, { emit }) {
+    console.log('PDFReader组件setup开始')
+    console.log('接收到的props:', props)
+    console.log('- pdfUrl:', props.pdfUrl)
+    console.log('- fileName:', props.fileName)
+    console.log('- originalPathname:', props.originalPathname)
+
     // PDF 相关状态
     const pdfDocument = ref(null)
     const currentPage = ref(1)
@@ -167,56 +174,87 @@ export default {
 
     // 加载 PDF
     const loadPDF = async () => {
-      if (!props.pdfUrl) return
+      console.log('开始加载PDF，URL:', props.pdfUrl)
+
+      if (!props.pdfUrl) {
+        console.error('PDF URL为空')
+        error.value = 'PDF URL为空'
+        return
+      }
 
       loading.value = true
       error.value = ''
       loadingStatus.value = '正在下载 PDF...'
 
       try {
+        console.log('创建PDF加载任务...')
         const loadingTask = pdfjsLib.getDocument({
           url: props.pdfUrl,
-          cMapUrl: null,
-          cMapPacked: false
+          cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsVersion}/cmaps/`,
+          cMapPacked: true
         })
 
         loadingTask.onProgress = (progress) => {
+          console.log('PDF加载进度:', progress)
           const percent = Math.round((progress.loaded / progress.total) * 100)
           loadingStatus.value = `正在加载 PDF... ${percent}%`
         }
 
+        console.log('等待PDF文档加载完成...')
         pdfDocument.value = await loadingTask.promise
+        console.log('PDF文档加载成功，页数:', pdfDocument.value.numPages)
+
         totalPages.value = pdfDocument.value.numPages
         loadingStatus.value = `PDF 加载完成 (${totalPages.value} 页)`
 
         // 渲染第一页
+        console.log('开始渲染第一页...')
         await renderPage(currentPage.value)
+        console.log('第一页渲染完成')
 
         // 生成缩略图
         if (totalPages.value > 1) {
+          console.log('开始生成缩略图...')
           await nextTick()
           generateThumbnails()
         }
 
       } catch (err) {
         console.error('PDF 加载失败:', err)
+        console.error('错误详情:', err.stack)
         error.value = `PDF 加载失败: ${err.message}`
       } finally {
         loading.value = false
+        console.log('PDF加载流程结束，loading状态:', loading.value)
       }
     }
 
     // 渲染页面
     const renderPage = async (pageNum) => {
-      if (!pdfDocument.value || !pdfCanvas.value) return
+      console.log(`开始渲染第${pageNum}页...`)
+      console.log('PDF文档是否存在:', !!pdfDocument.value)
+      console.log('Canvas是否存在:', !!pdfCanvas.value)
+
+      if (!pdfDocument.value) {
+        console.error('PDF文档不存在')
+        return
+      }
+
+      if (!pdfCanvas.value) {
+        console.error('Canvas元素不存在')
+        return
+      }
 
       try {
+        console.log(`获取第${pageNum}页...`)
         const page = await pdfDocument.value.getPage(pageNum)
         const viewport = page.getViewport({ scale: currentScale.value })
+        console.log(`第${pageNum}页视口尺寸:`, viewport.width, 'x', viewport.height)
 
         const canvas = pdfCanvas.value
         const context = canvas.getContext('2d')
 
+        console.log('设置Canvas尺寸...')
         canvas.height = viewport.height
         canvas.width = viewport.width
 
@@ -225,11 +263,15 @@ export default {
           viewport: viewport
         }
 
+        console.log('开始渲染页面到Canvas...')
         await page.render(renderContext).promise
+        console.log('页面渲染完成')
+
         loadingStatus.value = `第 ${pageNum} 页 / 共 ${totalPages.value} 页`
 
       } catch (err) {
         console.error('页面渲染失败:', err)
+        console.error('渲染错误详情:', err.stack)
         error.value = `页面 ${pageNum} 渲染失败: ${err.message}`
       }
     }
@@ -367,14 +409,30 @@ export default {
 
     // 监听 PDF URL 变化
     watch(() => props.pdfUrl, (newUrl) => {
+      console.log('PDF URL发生变化:', newUrl)
       if (newUrl) {
+        console.log('PDF URL不为空，开始加载PDF')
         currentPage.value = 1
         currentScale.value = 1.0
         loadPDF()
+      } else {
+        console.log('PDF URL为空，跳过加载')
       }
     }, { immediate: true })
 
     onMounted(() => {
+      console.log('PDFReader组件mounted')
+      console.log('mounted时的props:')
+      console.log('- pdfUrl:', props.pdfUrl)
+      console.log('- fileName:', props.fileName)
+      console.log('- originalPathname:', props.originalPathname)
+
+      // 如果props.pdfUrl存在但还没开始加载，手动触发加载
+      if (props.pdfUrl && !loading.value && !pdfDocument.value) {
+        console.log('mounted时发现PDF存在但未加载，手动触发加载')
+        loadPDF()
+      }
+
       // 监听键盘事件
       const handleKeydown = (event) => {
         if (event.target.tagName === 'INPUT') return

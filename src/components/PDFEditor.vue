@@ -56,15 +56,25 @@ export default {
   methods: {
     // 初始化页面参数
     initPage() {
+      console.log('初始化编辑页面参数...')
       const urlParams = new URLSearchParams(window.location.search)
       const file = urlParams.get('file')
+      console.log('URL参数file:', file)
 
       if (file) {
         try {
+          console.log('解析文件参数...')
           const fileData = JSON.parse(decodeURIComponent(file))
+          console.log('解析的文件数据:', fileData)
+
           this.pdfUrl = fileData.url
           this.fileName = fileData.name
           this.originalPathname = fileData.pathname
+
+          console.log('设置参数完成:')
+          console.log('- pdfUrl:', this.pdfUrl)
+          console.log('- fileName:', this.fileName)
+          console.log('- originalPathname:', this.originalPathname)
 
           // 更新页面标题
           document.title = `编辑 ${this.fileName} - 文件阅读管理`
@@ -74,6 +84,7 @@ export default {
           this.router.push('/')
         }
       } else {
+        console.error('URL中未找到file参数')
         window.$toast.error('参数缺失', '未找到文件信息')
         this.router.push('/')
       }
@@ -179,7 +190,12 @@ export default {
     }
   },
   mounted() {
+    console.log('PDFEditor组件mounted')
     this.initPage()
+    console.log('PDFEditor mounted完成，传递给PDFReader的参数:')
+    console.log('- pdfUrl:', this.pdfUrl)
+    console.log('- fileName:', this.fileName)
+    console.log('- originalPathname:', this.originalPathname)
   },
   beforeRouteUpdate(to, from, next) {
     this.initPage()
