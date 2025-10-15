@@ -159,8 +159,8 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// 配置PDF.js worker - 使用CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+// 配置PDF.js worker - 使用本地文件
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/src/static/pdf.worker.min.js'
 
 export default {
   name: 'PDFViewer',
