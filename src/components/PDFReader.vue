@@ -125,7 +125,6 @@
 <script>
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
-import { put } from '@vercel/blob'
 
 // 设置 PDF.js worker - 使用本地文件
 pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`
@@ -145,7 +144,7 @@ export default {
     },
     originalPathname: {
       type: String,
-      required: true
+      default: ''
     }
   },
   emits: ['close'],
@@ -177,8 +176,8 @@ export default {
       try {
         const loadingTask = pdfjsLib.getDocument({
           url: props.pdfUrl,
-          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/cmaps/',
-          cMapPacked: true
+          cMapUrl: null,
+          cMapPacked: false
         })
 
         loadingTask.onProgress = (progress) => {
@@ -239,12 +238,18 @@ export default {
     const generateThumbnails = async () => {
       if (!pdfDocument.value) return
 
+      await nextTick()
+
       for (let pageNum = 1; pageNum <= Math.min(totalPages.value, 10); pageNum++) {
         try {
           const page = await pdfDocument.value.getPage(pageNum)
           const viewport = page.getViewport({ scale: 0.2 })
 
-          const canvas = document.querySelector(`[ref="thumbnail-${pageNum}"]`)
+          // 使用 Vue 的 ref 系统来获取 canvas
+          const canvasRef = `thumbnail-${pageNum}`
+          const canvas = document.querySelector(`canvas[data-v-${canvasRef}]`) ||
+                        document.querySelector(`.thumbnail-canvas`)
+
           if (canvas) {
             const context = canvas.getContext('2d')
             canvas.height = viewport.height
