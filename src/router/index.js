@@ -9,8 +9,8 @@ const routes = [
   },
     {
     path: '/browser-viewer',
-    name: 'BrowserPDF',
-    component: () => import('../components/BrowserPDF.vue')
+    name: 'SimplePDFViewer',
+    component: () => import('../components/PDFViewer.vue')
   }
 ]
 
