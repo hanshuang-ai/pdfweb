@@ -233,23 +233,10 @@ export default {
     const renderPage = async (pageNum) => {
       console.log(`开始渲染第${pageNum}页...`)
       console.log('PDF文档是否存在:', !!pdfDocument.value)
-      console.log('Canvas是否存在:', !!pdfCanvas.value)
 
       if (!pdfDocument.value) {
         console.error('PDF文档不存在')
         return
-      }
-
-      // 如果Canvas不存在，等待并重试
-      if (!pdfCanvas.value) {
-        console.log('Canvas元素不存在，等待DOM渲染...')
-        await new Promise(resolve => setTimeout(resolve, 200))
-
-        if (!pdfCanvas.value) {
-          console.error('Canvas元素仍然不存在')
-          return
-        }
-        console.log('Canvas元素已准备好，继续渲染')
       }
 
       try {
@@ -258,7 +245,15 @@ export default {
         const viewport = page.getViewport({ scale: currentScale.value })
         console.log(`第${pageNum}页视口尺寸:`, viewport.width, 'x', viewport.height)
 
-        const canvas = pdfCanvas.value
+        // 直接使用原生DOM API获取Canvas
+        const canvas = document.querySelector('.pdf-canvas')
+        console.log('获取到的Canvas元素:', canvas)
+
+        if (!canvas) {
+          console.error('Canvas元素不存在')
+          return
+        }
+
         const context = canvas.getContext('2d')
 
         console.log('设置Canvas尺寸...')
@@ -358,10 +353,13 @@ export default {
     }
 
     const fitToWidth = () => {
-      if (!pdfCanvas.value || !pdfContainer.value) return
+      const container = document.querySelector('.pdf-container')
+      const canvas = document.querySelector('.pdf-canvas')
 
-      const containerWidth = pdfContainer.value.clientWidth - 40
-      const canvasWidth = pdfCanvas.value.width
+      if (!container || !canvas) return
+
+      const containerWidth = container.clientWidth - 40
+      const canvasWidth = canvas.width
 
       if (canvasWidth > 0) {
         currentScale.value = containerWidth / canvasWidth
@@ -429,10 +427,8 @@ export default {
         loadingStatus.value = ''
         pdfDocument.value = null
 
-        // 延迟更长时间确保DOM已更新
-        setTimeout(() => {
-          loadPDF()
-        }, 500)
+        // 直接加载，不需要延迟
+        loadPDF()
       } else if (!newUrl) {
         console.log('PDF URL为空，跳过加载')
       }
@@ -440,24 +436,6 @@ export default {
 
     onMounted(() => {
       console.log('PDFReader组件mounted')
-      console.log('mounted时的props:')
-      console.log('- pdfUrl:', props.pdfUrl)
-      console.log('- fileName:', props.fileName)
-      console.log('- originalPathname:', props.originalPathname)
-      console.log('mounted时Canvas是否存在:', !!pdfCanvas.value)
-
-      // 如果props.pdfUrl存在但还没开始加载，延迟后手动触发加载
-      if (props.pdfUrl && !loading.value && !pdfDocument.value) {
-        console.log('mounted时发现PDF存在但未加载，延迟后手动触发加载')
-        setTimeout(() => {
-          console.log('延迟后检查Canvas是否存在:', !!pdfCanvas.value)
-          if (pdfCanvas.value) {
-            loadPDF()
-          } else {
-            console.error('延迟后Canvas仍不存在，可能DOM未完全渲染')
-          }
-        }, 300)
-      }
 
       // 监听键盘事件
       const handleKeydown = (event) => {
