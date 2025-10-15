@@ -25,7 +25,37 @@
 
     <!-- Canvas始终存在于DOM中 -->
     <div class="pdf-canvas-container" style="margin-top: 20px;">
-      <h3>第一页预览:</h3>
+      <h3>PDF预览:</h3>
+
+      <!-- 页面导航控件 -->
+      <div v-if="result" class="page-navigation" style="margin: 15px 0; display: flex; align-items: center; gap: 10px;">
+        <button
+          @click="previousPage"
+          :disabled="currentPage <= 1"
+          style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: white;">
+          ⬅️ 上一页
+        </button>
+
+        <div style="display: flex; align-items: center; gap: 5px;">
+          <input
+            v-model.number="currentPageInput"
+            @keyup.enter="goToPage(currentPageInput)"
+            type="number"
+            :min="1"
+            :max="result.numPages"
+            style="width: 60px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; text-align: center;"
+          />
+          <span>/ {{ result.numPages }}</span>
+        </div>
+
+        <button
+          @click="nextPage"
+          :disabled="currentPage >= result.numPages"
+          style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: white;">
+          下一页 ➡️
+        </button>
+      </div>
+
       <canvas ref="testCanvas" class="test-canvas" style="border: 1px solid #ccc; max-width: 100%; background: white;"></canvas>
       <p style="font-size: 12px; color: #666; margin-top: 5px;">
         如果看不到PDF内容，请查看浏览器控制台的详细日志
@@ -57,6 +87,8 @@ export default {
     const result = ref(null)
     const pdfDocument = ref(null)
     const testCanvas = ref(null)
+    const currentPage = ref(1)
+    const currentPageInput = ref(1)
 
     const testPDF = async () => {
       if (!testUrl.value) {
@@ -89,15 +121,47 @@ export default {
           info: 'PDF加载成功'
         }
 
-        // 尝试渲染第一页
-        console.log('开始渲染第一页...')
+        // 重置到第一页并渲染
+        currentPage.value = 1
+        currentPageInput.value = 1
+        await renderPage(currentPage.value)
 
-        const page = await pdf.getPage(1)
-        console.log('获取到第1页对象')
+      } catch (err) {
+        console.error('PDF测试失败:', err)
+        error.value = err.message
+      } finally {
+        loading.value = false
+      }
+    }
+
+    return {
+      testUrl,
+      loading,
+      error,
+      result,
+      testCanvas,
+      currentPage,
+      currentPageInput,
+      testPDF,
+      renderPage,
+      previousPage,
+      nextPage,
+      goToPage
+    }
+
+    // 渲染指定页面
+    const renderPage = async (pageNum) => {
+      if (!pdfDocument.value) return
+
+      try {
+        console.log(`开始渲染第${pageNum}页...`)
+
+        const page = await pdfDocument.value.getPage(pageNum)
+        console.log(`获取到第${pageNum}页对象`)
 
         // 使用较小的缩放比例，避免Canvas过大
         const viewport = page.getViewport({ scale: 0.5 })
-        console.log('视口尺寸:', viewport.width, 'x', viewport.height)
+        console.log(`第${pageNum}页视口尺寸:`, viewport.width, 'x', viewport.height)
 
         // Canvas现在始终存在于DOM中，直接获取
         const canvas = document.querySelector('.test-canvas')
@@ -132,32 +196,46 @@ export default {
           viewport: viewport
         }
 
-        console.log('开始渲染到Canvas...')
+        console.log(`开始渲染第${pageNum}页到Canvas...`)
         await page.render(renderContext).promise
-        console.log('Canvas渲染完成!')
+        console.log(`第${pageNum}页渲染完成!`)
 
-        // 检查Canvas是否有内容
-        const imageData = context.getImageData(0, 0, 1, 1)
-        console.log('Canvas像素数据:', imageData.data)
-
-        result.value.info += '，第一页渲染成功'
-        result.value.canvasSize = `${canvas.width}x${canvas.height}`
+        // 更新结果显示
+        if (result.value) {
+          result.value.info = `PDF加载成功，第${pageNum}页渲染成功`
+          result.value.canvasSize = `${canvas.width}x${canvas.height}`
+          result.value.currentPage = pageNum
+        }
 
       } catch (err) {
-        console.error('PDF测试失败:', err)
-        error.value = err.message
-      } finally {
-        loading.value = false
+        console.error(`第${pageNum}页渲染失败:`, err)
+        error.value = `第${pageNum}页渲染失败: ${err.message}`
       }
     }
 
-    return {
-      testUrl,
-      loading,
-      error,
-      result,
-      testCanvas,
-      testPDF
+    // 页面导航方法
+    const previousPage = () => {
+      if (currentPage.value > 1) {
+        currentPage.value--
+        currentPageInput.value = currentPage.value
+        renderPage(currentPage.value)
+      }
+    }
+
+    const nextPage = () => {
+      if (pdfDocument.value && currentPage.value < pdfDocument.value.numPages) {
+        currentPage.value++
+        currentPageInput.value = currentPage.value
+        renderPage(currentPage.value)
+      }
+    }
+
+    const goToPage = (pageNum) => {
+      if (pdfDocument.value && pageNum >= 1 && pageNum <= pdfDocument.value.numPages) {
+        currentPage.value = pageNum
+        currentPageInput.value = pageNum
+        renderPage(pageNum)
+      }
     }
   },
   mounted() {
