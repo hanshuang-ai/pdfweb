@@ -20,11 +20,15 @@
       <h3>PDF信息:</h3>
       <p>页数: {{ result.numPages }}</p>
       <p>信息: {{ result.info }}</p>
+      <p v-if="result.canvasSize">Canvas尺寸: {{ result.canvasSize }}</p>
     </div>
 
     <div v-if="pdfDocument" class="pdf-canvas-container" style="margin-top: 20px;">
       <h3>第一页预览:</h3>
-      <canvas ref="testCanvas" style="border: 1px solid #ccc;"></canvas>
+      <canvas ref="testCanvas" style="border: 1px solid #ccc; max-width: 100%; background: white;"></canvas>
+      <p style="font-size: 12px; color: #666; margin-top: 5px;">
+        如果看不到PDF内容，请查看浏览器控制台的详细日志
+      </p>
     </div>
   </div>
 </template>
@@ -76,21 +80,47 @@ export default {
 
         // 尝试渲染第一页
         if (testCanvas.value) {
+          console.log('开始渲染第一页...')
+          console.log('Canvas元素:', testCanvas.value)
+
           const page = await pdf.getPage(1)
-          const viewport = page.getViewport({ scale: 1.0 })
+          console.log('获取到第1页对象')
+
+          // 使用较小的缩放比例，避免Canvas过大
+          const viewport = page.getViewport({ scale: 0.5 })
+          console.log('视口尺寸:', viewport.width, 'x', viewport.height)
 
           const canvas = testCanvas.value
+          console.log('Canvas设置前:', canvas.width, 'x', canvas.height)
+
           const context = canvas.getContext('2d')
+          console.log('获取到2D上下文:', !!context)
+
+          // 清空Canvas并设置尺寸
+          context.clearRect(0, 0, canvas.width, canvas.height)
           canvas.height = viewport.height
           canvas.width = viewport.width
 
-          await page.render({
+          console.log('Canvas设置后:', canvas.width, 'x', canvas.height)
+
+          const renderContext = {
             canvasContext: context,
             viewport: viewport
-          }).promise
+          }
 
-          console.log('第一页渲染成功')
+          console.log('开始渲染到Canvas...')
+          await page.render(renderContext).promise
+          console.log('Canvas渲染完成!')
+
+          // 检查Canvas是否有内容
+          const imageData = context.getImageData(0, 0, 1, 1)
+          console.log('Canvas像素数据:', imageData.data)
+
           result.value.info += '，第一页渲染成功'
+          result.value.canvasSize = `${canvas.width}x${canvas.height}`
+        } else {
+          console.error('Canvas元素不存在')
+          error.value = 'Canvas元素不存在'
         }
 
       } catch (err) {
