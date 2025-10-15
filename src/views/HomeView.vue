@@ -32,6 +32,11 @@
       </div>
     </div>
 
+    <!-- PDF测试区域 -->
+    <div class="pdf-test-section" style="background: white; margin: 20px; padding: 20px; border-radius: 8px;">
+      <SimplePDFTest />
+    </div>
+
     <!-- 底部信息 -->
     <div class="app-footer">
       <div class="footer-content">
@@ -44,12 +49,14 @@
 <script>
 import FileUploader from '../components/FileUploader.vue'
 import FileList from '../components/FileList.vue'
+import SimplePDFTest from '../components/SimplePDFTest.vue'
 
 export default {
   name: 'HomeView',
   components: {
     FileUploader,
-    FileList
+    FileList,
+    SimplePDFTest
   },
   methods: {
     refreshFileList() {
