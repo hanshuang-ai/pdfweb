@@ -126,11 +126,8 @@
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// 设置 PDF.js worker - 使用URL方式
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString()
+// 设置 PDF.js worker - 3.x版本使用简单URL
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
 
 console.log('PDF.js 版本:', pdfjsLib.version)
 console.log('Worker 路径:', pdfjsLib.GlobalWorkerOptions.workerSrc)
