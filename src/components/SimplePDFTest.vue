@@ -23,7 +23,8 @@
       <p v-if="result.canvasSize">Canvas尺寸: {{ result.canvasSize }}</p>
     </div>
 
-    <div v-if="pdfDocument" class="pdf-canvas-container" style="margin-top: 20px;">
+    <!-- 使用v-show替代v-if，确保Canvas始终在DOM中 -->
+    <div v-show="pdfDocument" class="pdf-canvas-container" style="margin-top: 20px;">
       <h3>第一页预览:</h3>
       <canvas ref="testCanvas" class="test-canvas" style="border: 1px solid #ccc; max-width: 100%; background: white;"></canvas>
       <p style="font-size: 12px; color: #666; margin-top: 5px;">
@@ -88,9 +89,20 @@ export default {
         const viewport = page.getViewport({ scale: 0.5 })
         console.log('视口尺寸:', viewport.width, 'x', viewport.height)
 
+        // 等待DOM更新，确保Canvas已渲染
+        await new Promise(resolve => setTimeout(resolve, 100))
+
         // 使用原生DOM API获取Canvas（就像PDFReader组件中那样）
-        const canvas = document.querySelector('.test-canvas')
+        let canvas = document.querySelector('.test-canvas')
         console.log('通过DOM查询获取Canvas:', canvas)
+
+        // 如果还是找不到，再等待一下
+        if (!canvas) {
+          console.log('Canvas仍未找到，再次等待...')
+          await new Promise(resolve => setTimeout(resolve, 300))
+          canvas = document.querySelector('.test-canvas')
+          console.log('再次查询Canvas:', canvas)
+        }
 
         if (!canvas) {
           console.error('Canvas元素不存在')
