@@ -1,5 +1,5 @@
 <template>
-  <div class="pdf-viewer-component" ref="viewerContainer">
+  <div class="pdf-viewer-component">
     <!-- PDF工具栏 -->
     <div class="pdf-toolbar" v-if="!isLoading">
       <div class="toolbar-left">
@@ -77,7 +77,7 @@
     </div>
 
     <!-- PDF渲染区域 -->
-    <div class="pdf-container" ref="pdfContainer">
+    <div class="pdf-container">
       <!-- 加载状态 -->
       <div v-if="isLoading" class="loading-state">
         <div class="loading-spinner">⏳</div>
@@ -101,7 +101,6 @@
       <!-- PDF画布 -->
       <div v-else class="pdf-canvas-container">
         <canvas
-          ref="pdfCanvas"
           class="pdf-canvas"
           @wheel="handleWheel"
           @click="handleCanvasClick"
@@ -109,7 +108,6 @@
 
         <!-- PDF文本层（用于文本选择和搜索） -->
         <div
-          ref="textLayer"
           class="text-layer"
           @click="handleCanvasClick"
         ></div>
@@ -137,7 +135,7 @@
           @click="goToPage(page)"
         >
           <canvas
-            :ref="`thumbnail-${page}`"
+            :class="`thumbnail-canvas thumbnail-${page}`"
             class="thumbnail-canvas"
           ></canvas>
           <div class="thumbnail-page-num">第 {{ page }} 页</div>
@@ -196,12 +194,7 @@ export default {
     const isFullscreen = ref(false)
     const showThumbnails = ref(false)
 
-    // DOM引用
-    const viewerContainer = ref(null)
-    const pdfContainer = ref(null)
-    const pdfCanvas = ref(null)
-    const textLayer = ref(null)
-
+  
     // 页面输入验证
     const currentPageInput = ref(1)
 
@@ -293,28 +286,23 @@ export default {
 
     // 渲染指定页面
     const renderPage = async (pageNum) => {
-      // 等待DOM元素准备就绪
-      let retryCount = 0
-      const maxRetries = 10
-
-      while ((!pdfDocument.value || !pdfCanvas.value || !pdfContainer.value) && retryCount < maxRetries) {
-        console.log(`等待DOM元素准备就绪... (${retryCount + 1}/${maxRetries})`)
-        await new Promise(resolve => setTimeout(resolve, 100))
-        retryCount++
-      }
-
       if (!pdfDocument.value) {
         console.error('PDF文档未加载完成')
         return
       }
 
-      if (!pdfCanvas.value) {
-        console.error('Canvas元素未找到')
+      // 使用querySelector获取DOM元素，而不是ref
+      const container = document.querySelector('.pdf-canvas-container')
+      const canvas = document.querySelector('.pdf-canvas')
+      const textLayer = document.querySelector('.text-layer')
+
+      if (!container) {
+        console.error('容器元素未找到')
         return
       }
 
-      if (!pdfContainer.value) {
-        console.error('容器元素未找到')
+      if (!canvas) {
+        console.error('Canvas元素未找到')
         return
       }
 
@@ -328,14 +316,14 @@ export default {
         // 计算缩放比例
         let scale = currentScale.value
         if (scale === 'auto') {
-          const containerWidth = pdfContainer.value ? pdfContainer.value.clientWidth - 40 : 800
+          const containerWidth = container ? container.clientWidth - 40 : 800
           const viewport = page.getViewport({ scale: 1.0 })
           scale = containerWidth / viewport.width
           currentScale.value = scale
           console.log(`自动缩放比例: ${scale}`)
         } else if (scale === 'page-fit') {
-          const containerHeight = pdfContainer.value ? pdfContainer.value.clientHeight - 100 : 600
-          const containerWidth = pdfContainer.value ? pdfContainer.value.clientWidth - 40 : 800
+          const containerHeight = container ? container.clientHeight - 100 : 600
+          const containerWidth = container ? container.clientWidth - 40 : 800
           const viewport = page.getViewport({ scale: 1.0 })
           const scaleX = containerWidth / viewport.width
           const scaleY = containerHeight / viewport.height
@@ -343,7 +331,7 @@ export default {
           currentScale.value = scale
           console.log(`适合页面缩放比例: ${scale}`)
         } else if (scale === 'page-width') {
-          const containerWidth = pdfContainer.value ? pdfContainer.value.clientWidth - 40 : 800
+          const containerWidth = container ? container.clientWidth - 40 : 800
           const viewport = page.getViewport({ scale: 1.0 })
           scale = containerWidth / viewport.width
           currentScale.value = scale
@@ -361,7 +349,6 @@ export default {
         console.log(`视口尺寸: ${viewport.width} x ${viewport.height}`)
 
         // 设置canvas尺寸
-        const canvas = pdfCanvas.value
         const context = canvas.getContext('2d')
 
         // 设置canvas实际尺寸
@@ -388,7 +375,9 @@ export default {
         console.log(`第 ${pageNum} 页渲染完成`)
 
         // 渲染文本层
-        await renderTextLayer(page, viewport)
+        if (textLayer) {
+          await renderTextLayer(page, viewport, textLayer)
+        }
 
         emit('page-changed', {
           pageNum,
@@ -410,20 +399,20 @@ export default {
     }
 
     // 渲染文本层
-    const renderTextLayer = async (page, viewport) => {
-      if (!textLayer.value) return
+    const renderTextLayer = async (page, viewport, textLayerElement) => {
+      if (!textLayerElement) return
 
       try {
         const textContent = await page.getTextContent()
 
         // 清空现有文本层
-        textLayer.value.innerHTML = ''
+        textLayerElement.innerHTML = ''
 
         // 设置文本层样式
-        textLayer.value.style.left = '0'
-        textLayer.value.style.top = '0'
-        textLayer.value.style.width = viewport.width + 'px'
-        textLayer.value.style.height = viewport.height + 'px'
+        textLayerElement.style.left = '0'
+        textLayerElement.style.top = '0'
+        textLayerElement.style.width = viewport.width + 'px'
+        textLayerElement.style.height = viewport.height + 'px'
 
         // 简化的文本层渲染
         // 创建文本片段
@@ -437,7 +426,7 @@ export default {
           textDiv.style.fontFamily = item.fontName
           textDiv.style.color = 'transparent'
           textDiv.textContent = item.str
-          textLayer.value.appendChild(textDiv)
+          textLayerElement.appendChild(textDiv)
         })
 
       } catch (err) {
@@ -521,7 +510,10 @@ export default {
     // 全屏控制
     const toggleFullscreen = () => {
       if (!document.fullscreenElement) {
-        viewerContainer.value.requestFullscreen()
+        const container = document.querySelector('.pdf-viewer-component')
+        if (container) {
+          container.requestFullscreen()
+        }
       } else {
         document.exitFullscreen()
       }
@@ -550,14 +542,17 @@ export default {
 
     const handleCanvasClick = (event) => {
       if (isFullscreen.value) {
-        const rect = pdfCanvas.value.getBoundingClientRect()
-        const x = event.clientX - rect.left
-        const canvasWidth = rect.width
+        const canvas = document.querySelector('.pdf-canvas')
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect()
+          const x = event.clientX - rect.left
+          const canvasWidth = rect.width
 
-        if (x < canvasWidth * 0.3) {
-          previousPage()
-        } else if (x > canvasWidth * 0.7) {
-          nextPage()
+          if (x < canvasWidth * 0.3) {
+            previousPage()
+          } else if (x > canvasWidth * 0.7) {
+            nextPage()
+          }
         }
       }
     }
@@ -675,12 +670,7 @@ export default {
       showThumbnails,
       currentPageInput,
 
-      // DOM引用
-      viewerContainer,
-      pdfContainer,
-      pdfCanvas,
-      textLayer,
-
+      
       // 方法
       previousPage,
       nextPage,
