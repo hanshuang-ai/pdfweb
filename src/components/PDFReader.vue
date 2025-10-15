@@ -240,9 +240,16 @@ export default {
         return
       }
 
+      // 如果Canvas不存在，等待并重试
       if (!pdfCanvas.value) {
-        console.error('Canvas元素不存在')
-        return
+        console.log('Canvas元素不存在，等待DOM渲染...')
+        await new Promise(resolve => setTimeout(resolve, 200))
+
+        if (!pdfCanvas.value) {
+          console.error('Canvas元素仍然不存在')
+          return
+        }
+        console.log('Canvas元素已准备好，继续渲染')
       }
 
       try {
@@ -422,10 +429,10 @@ export default {
         loadingStatus.value = ''
         pdfDocument.value = null
 
-        // 延迟一点时间确保DOM已更新
+        // 延迟更长时间确保DOM已更新
         setTimeout(() => {
           loadPDF()
-        }, 100)
+        }, 500)
       } else if (!newUrl) {
         console.log('PDF URL为空，跳过加载')
       }
@@ -437,11 +444,19 @@ export default {
       console.log('- pdfUrl:', props.pdfUrl)
       console.log('- fileName:', props.fileName)
       console.log('- originalPathname:', props.originalPathname)
+      console.log('mounted时Canvas是否存在:', !!pdfCanvas.value)
 
-      // 如果props.pdfUrl存在但还没开始加载，手动触发加载
+      // 如果props.pdfUrl存在但还没开始加载，延迟后手动触发加载
       if (props.pdfUrl && !loading.value && !pdfDocument.value) {
-        console.log('mounted时发现PDF存在但未加载，手动触发加载')
-        loadPDF()
+        console.log('mounted时发现PDF存在但未加载，延迟后手动触发加载')
+        setTimeout(() => {
+          console.log('延迟后检查Canvas是否存在:', !!pdfCanvas.value)
+          if (pdfCanvas.value) {
+            loadPDF()
+          } else {
+            console.error('延迟后Canvas仍不存在，可能DOM未完全渲染')
+          }
+        }, 300)
       }
 
       // 监听键盘事件
