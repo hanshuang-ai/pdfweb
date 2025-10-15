@@ -249,9 +249,19 @@ export default {
 		};
 
     const editPDF = (file) => {
-      // 跳转到浏览器内置阅读器页面，并打开该文件链接
+      // 跳转到PDF浏览器查看器页面，并传递文件URL和文件名
       const encodedUrl = encodeURIComponent(file.url);
-      router.push(`/browser-viewer?url=${encodedUrl}`);
+      const encodedFileName = encodeURIComponent(file.originalName || '');
+      router.push({
+        path: '/browser-viewer',
+        query: {
+          url: file.url,
+          fileName: file.originalName || ''
+        }
+      });
+
+      // 显示提示信息
+      window.$toast.success('跳转成功', `正在打开 ${file.originalName} 进行查看`);
     };
 
 		const deleteFile = async (pathname) => {
