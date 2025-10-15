@@ -81,7 +81,7 @@
       <!-- 加载状态 -->
       <div v-if="isLoading" class="loading-state">
         <div class="loading-spinner">⏳</div>
-        <div class="loading-text">正在加载PDF...</div>
+        <div class="loading-text">正在加载PDF文档...</div>
         <div class="loading-progress" v-if="loadingProgress > 0">
           <div class="progress-bar">
             <div class="progress-fill" :style="{ width: loadingProgress + '%' }"></div>
@@ -93,7 +93,7 @@
       <!-- 错误状态 -->
       <div v-else-if="error" class="error-state">
         <div class="error-icon">❌</div>
-        <div class="error-title">PDF加载失败</div>
+        <div class="error-title">PDF文档加载失败</div>
         <div class="error-message">{{ error }}</div>
         <button @click="retryLoad" class="retry-btn">重试</button>
       </div>
@@ -213,7 +213,7 @@ export default {
     // 加载PDF文档
     const loadPDF = async () => {
       if (!props.pdfUrl) {
-        error.value = 'PDF URL为空'
+        error.value = 'PDF链接为空'
         isLoading.value = false
         return
       }
@@ -293,8 +293,28 @@ export default {
 
     // 渲染指定页面
     const renderPage = async (pageNum) => {
-      if (!pdfDocument.value || !pdfCanvas.value) {
-        console.error('PDF文档或Canvas未准备就绪')
+      // 等待DOM元素准备就绪
+      let retryCount = 0
+      const maxRetries = 10
+
+      while ((!pdfDocument.value || !pdfCanvas.value || !pdfContainer.value) && retryCount < maxRetries) {
+        console.log(`等待DOM元素准备就绪... (${retryCount + 1}/${maxRetries})`)
+        await new Promise(resolve => setTimeout(resolve, 100))
+        retryCount++
+      }
+
+      if (!pdfDocument.value) {
+        console.error('PDF文档未加载完成')
+        return
+      }
+
+      if (!pdfCanvas.value) {
+        console.error('Canvas元素未找到')
+        return
+      }
+
+      if (!pdfContainer.value) {
+        console.error('容器元素未找到')
         return
       }
 
@@ -606,13 +626,31 @@ export default {
     // 监听props变化
     watch(() => props.pdfUrl, (newUrl) => {
       if (newUrl) {
-        loadPDF()
+        // 重置状态
+        error.value = ''
+        loading.value = true
+
+        // 延迟加载以确保DOM准备就绪
+        setTimeout(() => {
+          loadPDF()
+        }, 100)
       }
-    }, { immediate: true })
+    })
 
     // 组件挂载
-    onMounted(() => {
+    onMounted(async () => {
       addEventListeners()
+
+      // 等待DOM渲染完成后再加载PDF
+      await nextTick()
+
+      // 如果有PDF URL，则加载
+      if (props.pdfUrl) {
+        // 延迟一点时间确保DOM完全准备就绪
+        setTimeout(() => {
+          loadPDF()
+        }, 100)
+      }
     })
 
     // 组件卸载

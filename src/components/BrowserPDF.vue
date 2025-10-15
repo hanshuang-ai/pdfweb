@@ -10,15 +10,15 @@
         <span class="file-name">{{ fileName }}</span>
       </div>
       <div class="toolbar-spacer"></div>
-      <button @click="toggleViewer" class="toggle-viewer-btn" :title="isUsingPDFJS ? '切换到浏览器模式' : '切换到PDF.js模式'">
+      <button @click="toggleViewer" class="toggle-viewer-btn" :title="isUsingPDFJS ? '切换到浏览器模式' : '切换到PDF阅读模式'">
         <span class="btn-icon">{{ isUsingPDFJS ? '🌐' : '📄' }}</span>
-        <span class="btn-text">{{ isUsingPDFJS ? '浏览器模式' : 'PDF.js模式' }}</span>
+        <span class="btn-text">{{ isUsingPDFJS ? '浏览器模式' : 'PDF阅读模式' }}</span>
       </button>
       <input
         v-if="!isUsingPDFJS"
         v-model="url"
         @keyup.enter="loadNewURL"
-        placeholder="输入PDF链接..."
+        placeholder="输入PDF文档链接..."
         class="url-input"
       />
     </div>
@@ -51,13 +51,13 @@
           <!-- 加载状态 -->
           <div v-if="loading" class="loading-overlay">
             <div class="loading-spinner">⏳</div>
-            <div class="loading-text">正在加载PDF...</div>
+            <div class="loading-text">正在加载PDF文档...</div>
           </div>
 
           <!-- 错误状态 -->
           <div v-if="error" class="error-overlay">
             <div class="error-icon">❌</div>
-            <div class="error-text">PDF加载失败</div>
+            <div class="error-text">PDF文档加载失败</div>
             <div class="error-message">{{ error }}</div>
             <button @click="retryLoad" class="retry-btn">重试</button>
           </div>
@@ -180,7 +180,7 @@ export default {
     // iframe加载错误
     const onIframeError = () => {
       loading.value = false
-      error.value = '无法加载PDF文件，请检查链接是否正确'
+      error.value = '无法加载PDF文档，请检查链接是否正确'
     }
 
     // PDF.js事件处理
@@ -211,9 +211,9 @@ export default {
 
       // 更新页面标题
       if (fileName) {
-        document.title = `${fileName} - PDF查看器`
+        document.title = `${fileName} - PDF阅读器`
       } else {
-        document.title = 'PDF查看器 - 文件阅读管理'
+        document.title = 'PDF阅读器 - 文件阅读管理'
       }
     })
 
