@@ -126,9 +126,9 @@
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// 设置 PDF.js worker - 使用CDN确保版本匹配
+// 设置 PDF.js worker - 使用本地文件确保版本匹配
 const pdfjsVersion = pdfjsLib.version
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsVersion}/build/pdf.worker.min.js`
+pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`
 console.log('PDF.js 版本:', pdfjsVersion)
 console.log('Worker 路径:', pdfjsLib.GlobalWorkerOptions.workerSrc)
 
@@ -190,7 +190,7 @@ export default {
         console.log('创建PDF加载任务...')
         const loadingTask = pdfjsLib.getDocument({
           url: props.pdfUrl,
-          cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsVersion}/cmaps/`,
+          cMapUrl: '/cmaps/',
           cMapPacked: true
         })
 
@@ -408,14 +408,25 @@ export default {
     })
 
     // 监听 PDF URL 变化
-    watch(() => props.pdfUrl, (newUrl) => {
-      console.log('PDF URL发生变化:', newUrl)
-      if (newUrl) {
-        console.log('PDF URL不为空，开始加载PDF')
+    watch(() => props.pdfUrl, (newUrl, oldUrl) => {
+      console.log('PDF URL发生变化:', { oldUrl, newUrl })
+      if (newUrl && newUrl !== oldUrl) {
+        console.log('PDF URL不为空且与之前不同，开始加载PDF')
+        // 重置状态
         currentPage.value = 1
+        currentPageInput.value = 1
+        totalPages.value = 0
         currentScale.value = 1.0
-        loadPDF()
-      } else {
+        loading.value = false
+        error.value = ''
+        loadingStatus.value = ''
+        pdfDocument.value = null
+
+        // 延迟一点时间确保DOM已更新
+        setTimeout(() => {
+          loadPDF()
+        }, 100)
+      } else if (!newUrl) {
         console.log('PDF URL为空，跳过加载')
       }
     }, { immediate: true })
