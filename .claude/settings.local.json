@@ -11,7 +11,8 @@
       "Bash(npm run dev)",
       "Bash(rm:*)",
       "Bash(git config:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npm run ac:*)"
     ],
     "deny": [],
     "ask": []
