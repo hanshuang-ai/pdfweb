@@ -105,14 +105,7 @@
 									<span class="btn-icon">📝</span>
 									<span class="btn-text">查看与编辑</span>
 								</button>
-								<button
-									@click="copyUrl(file.url)"
-									class="action-btn copy-btn"
-									title="复制链接"
-								>
-									<span class="btn-icon">📋</span>
-									<span class="btn-text">复制</span>
-								</button>
+
 								<button
 									@click="deleteFile(file.pathname)"
 									:disabled="deleting"

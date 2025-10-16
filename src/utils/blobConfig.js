@@ -12,7 +12,7 @@ export const blobConfig = {
   uploadOptions: {
     access: 'public',
     addRandomSuffix: true,
-    cacheControlMaxAge: 31536000, // 1年缓存
+    cacheControlMaxAge: 60, // 1年缓存
   }
 }
 
