@@ -5,7 +5,7 @@ export const blobConfig = {
   region: import.meta.env.VITE_BLOB_REGION || 'hkg1',
   baseUrl: import.meta.env.VITE_BLOB_BASE_URL || 'https://fmatek5mfkum5gbd.public.blob.vercel-storage.com',
 
-  // 认证令牌 (可选，用于显示配置状态)
+  // 认证令牌 (用于客户端直传)
   token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN,
 
   // 上传选项 (用于显示信息，实际上传由API处理)

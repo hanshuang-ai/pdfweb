@@ -106,30 +106,24 @@ const savePDF = async () => {
 
     // 获取pathname（从URL中提取路径部分）
     const url = new URL(pdfUrl.value)
-    const pathname = url.pathname + url.search
+    const pathname = url.pathname
 
     console.log('Extracted pathname:', pathname)
 
-    // 调用更新API
-    const response = await fetch('/api/update-pdf', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        pathname: pathname,
-        newPdfData: editedPdfData,
-        mimeType: 'application/pdf'
-      })
-    })
+    // 将base64转换为Blob
+    const pdfBlob = await fetch(editedPdfData).then(res => res.blob())
+    console.log('PDF blob size:', pdfBlob.size, 'bytes')
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.details || `保存失败: ${response.statusText}`)
+    // 根据文件大小选择保存策略
+    const maxApiSize = 4.5 * 1024 * 1024 // 4.5MB
+
+    if (pdfBlob.size <= maxApiSize) {
+      console.log('Using API upload for small PDF')
+      await saveViaAPI(pathname, editedPdfData)
+    } else {
+      console.log('Using direct upload for large PDF')
+      await saveDirectly(pathname, pdfBlob)
     }
-
-    const result = await response.json()
-    console.log('PDF saved successfully:', result)
 
     // 显示成功提示
     if (window.$toast) {
@@ -144,6 +138,73 @@ const savePDF = async () => {
   } finally {
     saving.value = false
   }
+}
+
+// 通过API保存 (小文件)
+const saveViaAPI = async (pathname, editedPdfData) => {
+  const response = await fetch('/api/update-pdf', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      pathname: pathname,
+      newPdfData: editedPdfData,
+      mimeType: 'application/pdf'
+    })
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.details || `保存失败: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  console.log('PDF saved via API successfully:', result)
+}
+
+// 直接上传到Vercel Blob (大文件)
+const saveDirectly = async (pathname, pdfBlob) => {
+  try {
+    // 导入Vercel Blob客户端SDK和配置
+    const { put } = await import('@vercel/blob')
+    const { blobConfig } = await import('../utils/blobConfig.js')
+
+    console.log('Uploading PDF directly to Vercel Blob...')
+
+    const blob = await put(pathname, pdfBlob, {
+      access: 'public',
+      token: blobConfig.token,
+      contentType: 'application/pdf',
+      allowOverwrite: true
+    })
+
+    console.log('PDF saved directly successfully:', blob.url)
+
+  } catch (directError) {
+    console.error('Direct upload failed:', directError)
+    console.log('Attempting fallback to API upload...')
+
+    // 备用机制：如果直接上传失败，尝试转换为base64后通过API上传
+    try {
+      const base64Data = await convertBlobToBase64(pdfBlob)
+      await saveViaAPI(pathname, base64Data)
+      console.log('Fallback API upload successful')
+    } catch (fallbackError) {
+      console.error('Fallback API upload also failed:', fallbackError)
+      throw new Error(`直接上传失败: ${directError.message}，备用上传也失败: ${fallbackError.message}`)
+    }
+  }
+}
+
+// 将Blob转换为base64
+const convertBlobToBase64 = (blob) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
 }
 
 // 从PDF.js iframe中获取编辑后的PDF数据
