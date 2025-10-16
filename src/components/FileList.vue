@@ -168,7 +168,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onActivated } from "vue";
 import { useRouter } from "vue-router";
 
 export default {
@@ -557,9 +557,19 @@ export default {
 
 		onMounted(() => {
 			if (!isInitialLoad.value) {
-        console.log('获取列表')
+        console.log('首次加载，获取文件列表')
 				fetchFileList();
 				isInitialLoad.value = true;
+			}
+		});
+
+		// 组件被 keep-alive 激活时的处理
+		onActivated(() => {
+			// 只有在首次加载后才需要检查是否需要刷新
+			if (isInitialLoad.value) {
+				console.log('组件被激活，检查是否需要刷新文件列表');
+				// 这里可以添加特定的刷新逻辑，比如检查文件是否被修改
+				// 暂时不自动刷新，保持用户体验
 			}
 		});
 

@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <!-- 路由视图 -->
-    <keep-alive>
+    <keep-alive include="HomeView">
       <router-view />
     </keep-alive>
 
