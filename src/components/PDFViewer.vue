@@ -131,12 +131,16 @@ const savePDF = async () => {
     const result = await response.json()
     console.log('PDF saved successfully:', result)
 
-    // 可以在这里添加成功提示
-    alert('PDF文件保存成功！')
+    // 显示成功提示
+    if (window.$toast) {
+      window.$toast.success('保存成功', 'PDF文件已成功保存并覆盖线上文件')
+    }
 
   } catch (error) {
     console.error('保存PDF失败:', error)
-    alert(`保存失败: ${error.message}`)
+    if (window.$toast) {
+      window.$toast.error('保存失败', `保存PDF时出错: ${error.message}`)
+    }
   } finally {
     saving.value = false
   }
@@ -167,12 +171,12 @@ const getEditedPDFData = async () => {
         saveButton.click()
 
         // 设置超时
-        setTimeout(() => {
-          console.log('保存超时，使用原始PDF')
-          fetchOriginalPDF()
-            .then(resolve)
-            .catch(reject)
-        }, 5000)
+        // setTimeout(() => {
+        //   console.log('保存超时，使用原始PDF')
+        //   fetchOriginalPDF()
+        //     .then(resolve)
+        //     .catch(reject)
+        // }, 5000)
 
       } else {
         console.log('未找到PDF.js保存按钮，尝试其他方法')
