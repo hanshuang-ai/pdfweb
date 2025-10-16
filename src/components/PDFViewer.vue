@@ -93,6 +93,12 @@ const savePDF = async () => {
       throw new Error('无法获取编辑后的PDF数据')
     }
 
+    // 获取pathname（从URL中提取路径部分）
+    const url = new URL(pdfUrl.value)
+    const pathname = url.pathname + url.search
+
+    console.log('Extracted pathname:', pathname)
+
     // 调用更新API
     const response = await fetch('/api/update-pdf', {
       method: 'PUT',
@@ -100,7 +106,7 @@ const savePDF = async () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        pathname: pdfUrl.value,
+        pathname: pathname,
         newPdfData: editedPdfData,
         mimeType: 'application/pdf'
       })
