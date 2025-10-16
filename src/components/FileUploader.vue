@@ -50,37 +50,38 @@
     >
       <div class="upload-zone-content">
         <div class="upload-icon" :class="{ 'icon-animate': uploading }">
-          <div v-if="!selectedFile" class="icon-idle">📁</div>
+          <div v-if="!selectedFiles || selectedFiles.length === 0" class="icon-idle">📁</div>
           <div v-else-if="uploading" class="icon-uploading">⏳</div>
           <div v-else class="icon-ready">✅</div>
         </div>
 
         <div class="upload-text">
-          <h3 v-if="!selectedFile">
+          <h3 v-if="!selectedFiles || selectedFiles.length === 0">
             拖拽文件到这里
           </h3>
           <h3 v-else-if="uploading">
-            正在上传...
+            正在上传 {{ selectedFiles.length }} 个文件...
           </h3>
           <h3 v-else>
             准备就绪
           </h3>
 
-          <p v-if="!selectedFile" class="upload-hint">
+          <p v-if="!selectedFiles || selectedFiles.length === 0" class="upload-hint">
             或者 <span class="link-text">点击选择文件</span>
-            <br><small style="color: #94a3b8;">支持最大 100MB 文件上传</small>
+            <br><small style="color: #94a3b8;">支持选择多个文件，每个最大 100MB</small>
           </p>
           <p v-else-if="uploading" class="upload-hint">
-            请稍候，文件正在处理中
+            请稍候，{{ selectedFiles.length }} 个文件正在处理中
           </p>
           <p v-else class="upload-hint">
-            {{ selectedFile.name }}
+            已选择 {{ selectedFiles.length }} 个文件
           </p>
         </div>
 
         <input
           ref="fileInput"
           type="file"
+          multiple
           class="upload-input"
           @change="handleFileSelect"
         />
@@ -88,34 +89,46 @@
     </div>
 
     <!-- 文件信息卡片 -->
-    <div v-if="selectedFile" class="file-card">
-      <div class="file-header">
-        <div class="file-icon">📄</div>
-        <div class="file-details">
-          <h4>{{ selectedFile.name }}</h4>
-          <div class="file-meta">
-            <span class="meta-item">{{ formatFileSize(selectedFile.size) }}</span>
-            <span class="meta-item">{{ selectedFile.type || '未知类型' }}</span>
+    <div v-if="selectedFiles && selectedFiles.length > 0" class="file-list">
+      <div class="file-list-header">
+        <h4>已选择的文件 ({{ selectedFiles.length }})</h4>
+        <button @click="clearFiles" class="clear-btn">清空</button>
+      </div>
+      <div class="file-cards-container">
+        <div v-for="(file, index) in selectedFiles" :key="index" class="file-card">
+          <div class="file-header">
+            <div class="file-icon">📄</div>
+            <div class="file-details">
+              <h4>{{ file.name }}</h4>
+              <div class="file-meta">
+                <span class="meta-item">{{ formatFileSize(file.size) }}</span>
+                <span class="meta-item">{{ file.type || '未知类型' }}</span>
+              </div>
+            </div>
+            <button @click="removeFile(index)" class="remove-file-btn">×</button>
           </div>
         </div>
+      </div>
+      <div class="total-info">
+        <span>总大小: {{ formatFileSize(selectedFiles.reduce((total, file) => total + file.size, 0)) }}</span>
       </div>
     </div>
 
     <!-- 上传按钮 -->
     <button
-      v-if="selectedFile && !uploading"
+      v-if="selectedFiles && selectedFiles.length > 0 && !uploading"
       @click="uploadFile"
-      :disabled="!selectedFile"
+      :disabled="!selectedFiles || selectedFiles.length === 0"
       class="upload-btn"
     >
       <span class="btn-icon">🚀</span>
-      开始上传
+      上传 {{ selectedFiles.length }} 个文件
     </button>
 
     <!-- 进度条 -->
     <div v-if="uploading" class="progress-section">
       <div class="progress-header">
-        <span>上传进度</span>
+        <span>上传进度 - {{ selectedFiles.length }} 个文件</span>
         <span class="progress-percentage">{{ uploadProgress }}%</span>
       </div>
       <div class="progress-bar">
@@ -123,6 +136,9 @@
           class="progress-fill"
           :style="{ width: uploadProgress + '%' }"
         ></div>
+      </div>
+      <div class="progress-status">
+        <span>正在并行上传文件...</span>
       </div>
     </div>
 
@@ -150,15 +166,15 @@
 
 <script>
 import { ref, onMounted } from 'vue'
-import { put } from '@vercel/blob'
 import { blobConfig, generateUniqueFilename, validateConfig, getBlobInfo } from '../utils/blobConfig.js'
 
 export default {
   name: 'FileUploader',
   emits: ['upload-success'],
-  setup(props, { emit }) {
+  setup(_, { emit }) {
     const fileInput = ref(null)
     const selectedFile = ref(null)
+    const selectedFiles = ref([])
     const uploading = ref(false)
     const uploadProgress = ref(0)
     const error = ref('')
@@ -183,9 +199,11 @@ export default {
     }
 
     const handleFileSelect = (event) => {
-      const file = event.target.files[0]
-      if (file) {
-        selectedFile.value = file
+      const files = Array.from(event.target.files)
+      if (files.length > 0) {
+        selectedFiles.value = files
+        // For backward compatibility, keep the first file as selectedFile
+        selectedFile.value = files[0]
         resetStatus()
       }
     }
@@ -200,9 +218,11 @@ export default {
 
     const handleDrop = (event) => {
       isDragOver.value = false
-      const file = event.dataTransfer.files[0]
-      if (file) {
-        selectedFile.value = file
+      const files = Array.from(event.dataTransfer.files)
+      if (files.length > 0) {
+        selectedFiles.value = files
+        // For backward compatibility, keep the first file as selectedFile
+        selectedFile.value = files[0]
         resetStatus()
       }
     }
@@ -212,6 +232,29 @@ export default {
       success.value = false
       uploadProgress.value = 0
       fileUrl.value = ''
+      selectedFiles.value = []
+      selectedFile.value = null
+    }
+
+    const clearFiles = () => {
+      selectedFiles.value = []
+      selectedFile.value = null
+      if (fileInput.value) {
+        fileInput.value.value = ''
+      }
+      resetStatus()
+    }
+
+    const removeFile = (index) => {
+      selectedFiles.value.splice(index, 1)
+      if (selectedFiles.value.length === 0) {
+        selectedFile.value = null
+      } else {
+        selectedFile.value = selectedFiles.value[0] // Keep the first file for backward compatibility
+      }
+      if (selectedFiles.value.length === 0 && fileInput.value) {
+        fileInput.value.value = ''
+      }
     }
 
     const formatFileSize = (bytes) => {
@@ -223,7 +266,7 @@ export default {
     }
 
     const uploadFile = async () => {
-      if (!selectedFile.value) return
+      if (!selectedFiles.value || selectedFiles.value.length === 0) return
 
       uploading.value = true
       error.value = ''
@@ -231,46 +274,54 @@ export default {
       uploadProgress.value = 0
 
       try {
-        // 生成唯一文件名
-        const filename = generateUniqueFilename(selectedFile.value)
+        console.log('=== MULTI-FILE UPLOAD START ===');
+        console.log('Files to upload:', selectedFiles.value.length);
 
-        console.log('=== FRONTEND UPLOAD START ===');
-        console.log('Selected file:', selectedFile.value.name);
-        console.log('File size:', selectedFile.value.size);
-        console.log('File type:', selectedFile.value.type);
-        console.log('Generated filename:', filename);
-
-        uploadProgress.value = 10
-
-        // 检查文件大小决定上传方式
+        const uploadPromises = []
         const maxApiSize = 4.5 * 1024 * 1024 // 4.5MB (API限制)
         const maxDirectSize = 100 * 1024 * 1024 // 100MB (Vercel Blob限制)
 
-        if (selectedFile.value.size > maxDirectSize) {
-          error.value = `文件太大！最大支持 ${formatFileSize(maxDirectSize)}，当前文件 ${formatFileSize(selectedFile.value.size)}`
-          return
+        // 检查所有文件大小
+        for (const file of selectedFiles.value) {
+          if (file.size > maxDirectSize) {
+            error.value = `文件 "${file.name}" 太大！最大支持 ${formatFileSize(maxDirectSize)}，当前文件 ${formatFileSize(file.size)}`
+            return
+          }
         }
 
-        let uploadResult
+        uploadProgress.value = 20
 
-        if (selectedFile.value.size <= maxApiSize) {
-          // 小文件：通过API上传 (更安全)
-          console.log('Using API upload for small file');
-          uploadResult = await uploadViaAPI(filename)
-        } else {
-          // 大文件：直接上传到Vercel Blob (绕过API限制)
-          console.log('Using direct upload for large file');
-          uploadResult = await uploadDirectly(filename)
+        // 为每个文件创建上传任务
+        for (let i = 0; i < selectedFiles.value.length; i++) {
+          const file = selectedFiles.value[i]
+          const filename = generateUniqueFilename(file)
+
+          console.log(`Processing file ${i + 1}/${selectedFiles.value.length}:`, file.name);
+
+          if (file.size <= maxApiSize) {
+            console.log(`Using API upload for small file: ${file.name}`);
+            uploadPromises.push(uploadViaAPI(file, filename))
+          } else {
+            console.log(`Using direct upload for large file: ${file.name}`);
+            uploadPromises.push(uploadDirectly(file, filename))
+          }
         }
 
-        fileUrl.value = uploadResult.url
+        uploadProgress.value = 60
+
+        // 等待所有文件上传完成
+        const results = await Promise.all(uploadPromises)
+
+        uploadProgress.value = 100
         success.value = true
+        fileUrl.value = results.length > 0 ? results[0].url : ''
 
         // 触发上传成功事件，通知父组件刷新文件列表
         emit('upload-success')
 
         // 重置表单
         setTimeout(() => {
+          selectedFiles.value = []
           selectedFile.value = null
           if (fileInput.value) {
             fileInput.value.value = ''
@@ -286,20 +337,16 @@ export default {
     }
 
     // 通过API上传 (小文件，更安全)
-    const uploadViaAPI = async (filename) => {
-      uploadProgress.value = 30
-
+    const uploadViaAPI = async (file, filename) => {
       const fileReader = new FileReader()
       const base64Promise = new Promise((resolve, reject) => {
         fileReader.onload = () => resolve(fileReader.result)
         fileReader.onerror = reject
       })
-      fileReader.readAsDataURL(selectedFile.value)
+      fileReader.readAsDataURL(file)
 
       const base64Data = await base64Promise
-      console.log('File converted to base64, length:', base64Data.length);
-
-      uploadProgress.value = 60
+      console.log(`File ${file.name} converted to base64, length:`, base64Data.length);
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -309,8 +356,8 @@ export default {
         body: JSON.stringify({
           file: base64Data,
           filename: filename,
-          originalName: selectedFile.value.name,
-          mimeType: selectedFile.value.type
+          originalName: file.name,
+          mimeType: file.type
         })
       })
 
@@ -319,42 +366,28 @@ export default {
         throw new Error(errorData.details || `API上传失败: ${response.statusText}`)
       }
 
-      uploadProgress.value = 100
       return await response.json()
     }
 
     // 直接上传到Vercel Blob (大文件，绕过API限制)
-    const uploadDirectly = async (filename) => {
-      uploadProgress.value = 30
-
-      console.log('Direct uploading to Vercel Blob...');
-
-      // 模拟上传进度
-      const progressInterval = setInterval(() => {
-        if (uploadProgress.value < 90) {
-          uploadProgress.value += Math.random() * 15
-        }
-      }, 500)
+    const uploadDirectly = async (file, filename) => {
+      console.log(`Direct uploading ${file.name} to Vercel Blob...`);
 
       try {
         // 直接使用客户端SDK上传
         const { put } = await import('@vercel/blob')
 
-        const blob = await put(filename, selectedFile.value, {
+        const blob = await put(filename, file, {
           access: 'public',
           token: blobConfig.token,
-          contentType: selectedFile.value.type || 'application/octet-stream'
+          contentType: file.type || 'application/octet-stream'
         })
 
-        clearInterval(progressInterval)
-        uploadProgress.value = 100
-
-        console.log('Direct upload successful:', blob.url);
+        console.log(`Direct upload successful for ${file.name}:`, blob.url);
         return { url: blob.url }
 
       } catch (directError) {
-        clearInterval(progressInterval)
-        console.error('Direct upload failed:', directError);
+        console.error(`Direct upload failed for ${file.name}:`, directError);
         throw new Error(`直接上传失败: ${directError.message}`)
       }
     }
@@ -420,6 +453,7 @@ export default {
     return {
       fileInput,
       selectedFile,
+      selectedFiles,
       uploading,
       uploadProgress,
       error,
@@ -435,7 +469,9 @@ export default {
       uploadFile,
       uploadViaAPI,
       uploadDirectly,
-      formatFileSize
+      formatFileSize,
+      clearFiles,
+      removeFile
     }
   }
 }
@@ -620,12 +656,98 @@ export default {
   display: none;
 }
 
-.file-card {
-  background: linear-gradient(135deg, #fafafa 0%, #f3f4f6 100%);
+.file-list {
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 12px;
   padding: 1.5rem;
   margin: 1.5rem 0;
   border: 1px solid #e5e7eb;
+  backdrop-filter: blur(10px);
+}
+
+.file-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.file-list-header h4 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.clear-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.clear-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.file-cards-container {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.file-card {
+  background: linear-gradient(135deg, #fafafa 0%, #f3f4f6 100%);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid #e5e7eb;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.file-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.remove-file-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: #ef4444;
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.remove-file-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.total-info {
+  text-align: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 600;
 }
 
 .file-header {
@@ -704,6 +826,13 @@ export default {
 .progress-percentage {
   font-weight: 600;
   color: #6366f1;
+}
+
+.progress-status {
+  margin-top: 0.5rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.875rem;
 }
 
 .progress-bar {
