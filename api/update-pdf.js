@@ -1,4 +1,4 @@
-import { put, del } from '@vercel/blob';
+import { put } from '@vercel/blob';
 
 export default async function handler(req, res) {
   // 允许CORS
@@ -49,22 +49,12 @@ export default async function handler(req, res) {
 
     console.log('PDF buffer size:', pdfBuffer.length, 'bytes');
 
-    // 先删除原文件（如果存在）
-    try {
-      await del(pathname, {
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-      });
-      console.log('Old file deleted:', pathname);
-    } catch (deleteError) {
-      // 如果文件不存在，继续执行上传
-      console.log('No existing file to delete or delete failed:', deleteError.message);
-    }
-
-    // 上传新文件
+    // 上传新文件（覆盖现有文件）
     const blob = await put(pathname, pdfBuffer, {
       access: 'public',
       token: process.env.BLOB_READ_WRITE_TOKEN,
-      contentType: mimeType
+      contentType: mimeType,
+      allowOverwrite: true
     });
 
     console.log('PDF updated successfully:', blob.url);
