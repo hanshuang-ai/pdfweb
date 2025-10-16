@@ -96,7 +96,17 @@
 							</span>
               <div class="file-actions">
 							<div class="action-buttons-left">
+								<button
+									v-if="getFileTypeLabel(file.contentType, file.pathname) === 'PDF'"
+									@click="viewPDF(file)"
+									class="action-btn view-btn"
+									title="查看PDF"
+								>
+									<span class="btn-icon">👁️</span>
+									<span class="btn-text">查看</span>
+								</button>
 								<a
+									v-else
 									:href="file.url"
 									target="_blank"
 									class="action-btn view-btn"
@@ -248,18 +258,34 @@ export default {
 			}
 		};
 
+    const viewPDF = (file) => {
+      // 跳转到PDF浏览器查看器页面，并传递文件URL和文件名
+      router.push({
+        path: '/browser-viewer',
+        query: {
+          url: file.url,
+          fileName: file.originalName || '',
+          mode: 'view' // 区分查看模式
+        }
+      });
+
+      // 显示提示信息
+      window.$toast.success('跳转成功', `正在打开 ${file.originalName} 进行查看`);
+    };
+
     const editPDF = (file) => {
       // 跳转到PDF浏览器查看器页面，并传递文件URL和文件名
       router.push({
         path: '/browser-viewer',
         query: {
           url: file.url,
-          fileName: file.originalName || ''
+          fileName: file.originalName || '',
+          mode: 'edit' // 区分编辑模式
         }
       });
 
       // 显示提示信息
-      window.$toast.success('跳转成功', `正在打开 ${file.originalName} 进行查看`);
+      window.$toast.success('跳转成功', `正在打开 ${file.originalName} 进行编辑`);
     };
 
 		const deleteFile = async (pathname) => {
@@ -569,6 +595,7 @@ export default {
 			totalPages,
 			refreshFileList,
 			copyUrl,
+			viewPDF,
 			editPDF,
 			deleteFile,
 			getTotalSize,

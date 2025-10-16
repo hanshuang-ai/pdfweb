@@ -66,7 +66,10 @@ const fileName = computed(() => {
 // 构建viewer URL，包含PDF文件参数
 const viewerUrl = computed(() => {
   const encodedPdfUrl = encodeURIComponent(pdfUrl.value)
-  return `/web/viewer.html?file=${encodedPdfUrl}#enableAnnotationAPI=true`
+  // 添加时间戳参数防止缓存
+  const timestamp = Date.now()
+  const cacheBuster = `&_t=${timestamp}`
+  return `/web/viewer.html?file=${encodedPdfUrl}${cacheBuster}#enableAnnotationAPI=true`
 })
 
 const onIframeLoad = () => {
