@@ -553,8 +553,14 @@ export default {
 		};
 
 		// 组件挂载时获取文件列表
+		const isInitialLoad = ref(false);
+
 		onMounted(() => {
-			fetchFileList();
+			if (!isInitialLoad.value) {
+        console.log('获取列表')
+				fetchFileList();
+				isInitialLoad.value = true;
+			}
 		});
 
 		return {
