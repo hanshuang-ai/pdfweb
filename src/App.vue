@@ -1,7 +1,9 @@
 <template>
   <div id="app">
     <!-- 路由视图 -->
-    <router-view />
+    <keep-alive>
+      <router-view />
+    </keep-alive>
 
     <!-- 全局组件（在所有页面都显示） -->
     <ToastNotification />
