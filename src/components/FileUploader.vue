@@ -232,8 +232,6 @@ export default {
       success.value = false
       uploadProgress.value = 0
       fileUrl.value = ''
-      selectedFiles.value = []
-      selectedFile.value = null
     }
 
     const clearFiles = () => {
