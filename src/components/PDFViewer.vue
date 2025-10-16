@@ -23,11 +23,13 @@
 
     <!-- 确认对话框 -->
     <ConfirmDialog
-      v-if="showDialog"
+      :visible="showDialog"
       title="确认保存"
       message="确定要保存当前PDF文件并覆盖线上文件吗？此操作不可撤销。"
+      type="danger"
       @confirm="savePDF"
       @cancel="cancelSave"
+      @update:visible="showDialog = $event"
     />
   </div>
 </template>
