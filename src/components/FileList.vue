@@ -98,31 +98,12 @@
 							<div class="action-buttons-left">
 								<button
 									v-if="getFileTypeLabel(file.contentType, file.pathname) === 'PDF'"
-									@click="viewPDF(file)"
-									class="action-btn view-btn"
-									title="查看PDF"
-								>
-									<span class="btn-icon">👁️</span>
-									<span class="btn-text">查看</span>
-								</button>
-								<a
-									v-else
-									:href="file.url"
-									target="_blank"
-									class="action-btn view-btn"
-									title="查看文件"
-								>
-									<span class="btn-icon">👁️</span>
-									<span class="btn-text">查看</span>
-								</a>
-								<button
-									v-if="getFileTypeLabel(file.contentType, file.pathname) === 'PDF'"
 									@click="editPDF(file)"
 									class="action-btn edit-btn"
-									title="编辑PDF"
+									title="查看与编辑PDF"
 								>
 									<span class="btn-icon">📝</span>
-									<span class="btn-text">编辑</span>
+									<span class="btn-text">查看与编辑</span>
 								</button>
 								<button
 									@click="copyUrl(file.url)"

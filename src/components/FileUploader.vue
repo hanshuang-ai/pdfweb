@@ -726,6 +726,7 @@ export default {
   width: 24px;
   height: 24px;
   border-radius: 50%;
+  padding: 0;
   font-size: 1rem;
   cursor: pointer;
   display: flex;

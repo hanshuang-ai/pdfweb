@@ -12,9 +12,9 @@
       <div class="header-content">
         <h1 class="app-title">
           <span class="icon">☁️</span>
-          文件阅读
+          阅读管理
         </h1>
-        <p class="app-subtitle">安全、快速的文件上传与管理平台</p>
+        <!-- <p class="app-subtitle">安全、快速的文件上传与管理平台</p> -->
       </div>
     </div>
 
@@ -32,7 +32,7 @@
       </div>
     </div>
 
-  
+
     <!-- 底部信息 -->
     <div class="app-footer">
       <div class="footer-content">

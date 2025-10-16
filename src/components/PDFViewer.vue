@@ -161,33 +161,10 @@ const getEditedPDFData = async () => {
         return
       }
 
-      console.log('PDF.js API可用，尝试获取编辑后的数据...')
+      console.log('PDF.js API可用，先触发内部保存功能...')
 
-      // 方法1: 尝试保存编辑后的文档
-      if (PDFViewerApplication.pdfDocument && PDFViewerApplication.pdfDocument.saveDocument) {
-        PDFViewerApplication.pdfDocument.saveDocument().then(data => {
-          if (data && data.length > 0) {
-            console.log('成功获取编辑后的PDF数据，大小:', data.length, 'bytes')
-            // 转换为base64
-            const reader = new FileReader()
-            reader.onload = () => {
-              const base64Data = reader.result
-              console.log('PDF数据已转换为base64，长度:', base64Data.length)
-              resolve(base64Data)
-            }
-            reader.readAsDataURL(new Blob([data], { type: 'application/pdf' }))
-          } else {
-            console.log('文档没有编辑内容，尝试触发下载获取数据')
-            triggerDownloadAndCapture(iframe, resolve, reject)
-          }
-        }).catch(error => {
-          console.warn('saveDocument失败，尝试触发下载:', error)
-          triggerDownloadAndCapture(iframe, resolve, reject)
-        })
-      } else {
-        console.log('pdfDocument.saveDocument不可用，尝试触发下载')
-        triggerDownloadAndCapture(iframe, resolve, reject)
-      }
+      // 优先触发PDF.js内部保存功能
+      triggerInternalSave(PDFViewerApplication, iframe, resolve, reject)
 
     } catch (error) {
       console.error('获取PDF数据时出错:', error)
@@ -196,96 +173,166 @@ const getEditedPDFData = async () => {
   })
 }
 
-// 通过触发下载来捕获PDF数据
-const triggerDownloadAndCapture = (iframe, resolve, reject) => {
+// 触发PDF.js内部保存功能
+const triggerInternalSave = (PDFViewerApplication, iframe, resolve, reject) => {
   try {
-    const PDFViewerApplication = iframe.contentWindow.PDFViewerApplication
+    console.log('尝试触发PDF.js内部保存...')
 
-    // 拦截下载事件
+    // 方法1: 直接调用PDFViewerApplication的保存功能
+    if (PDFViewerApplication.download) {
+      console.log('触发PDFViewerApplication.download()')
+      interceptDownloadCapture(iframe, resolve, reject)
+      PDFViewerApplication.download()
+      return
+    }
+
+    // 方法2: 尝试调用文档保存
+    if (PDFViewerApplication.pdfDocument && PDFViewerApplication.pdfDocument.save) {
+      console.log('触发pdfDocument.save()')
+      interceptDownloadCapture(iframe, resolve, reject)
+      PDFViewerApplication.pdfDocument.save()
+      return
+    }
+
+    // 方法3: 尝试调用saveDocument获取编辑内容
+    if (PDFViewerApplication.pdfDocument && PDFViewerApplication.pdfDocument.saveDocument) {
+      console.log('尝试saveDocument获取编辑内容')
+      PDFViewerApplication.pdfDocument.saveDocument().then(data => {
+        if (data && data.length > 0) {
+          console.log('成功获取编辑后的PDF数据，大小:', data.length, 'bytes')
+          // 转换为base64
+          const reader = new FileReader()
+          reader.onload = () => {
+            const base64Data = reader.result
+            console.log('PDF数据已转换为base64，长度:', base64Data.length)
+            resolve(base64Data)
+          }
+          reader.readAsDataURL(new Blob([data], { type: 'application/pdf' }))
+        } else {
+          console.log('saveDocument返回空数据，尝试其他方法')
+          fallbackMethods(iframe, resolve, reject)
+        }
+      }).catch(error => {
+        console.warn('saveDocument失败，尝试其他方法:', error)
+        fallbackMethods(iframe, resolve, reject)
+      })
+      return
+    }
+
+    // 如果以上方法都不可用，使用备用方法
+    console.log('主要方法不可用，使用备用方法')
+    fallbackMethods(iframe, resolve, reject)
+
+  } catch (error) {
+    console.error('触发内部保存时出错:', error)
+    fallbackMethods(iframe, resolve, reject)
+  }
+}
+
+// 拦截下载捕获数据
+const interceptDownloadCapture = (iframe, resolve, reject) => {
+  try {
+    console.log('设置下载拦截...')
+
+    // 拦截URL.createObjectURL来捕获下载的Blob
     const originalCreateObjectURL = iframe.contentWindow.URL.createObjectURL
     const originalRevokeObjectURL = iframe.contentWindow.URL.revokeObjectURL
 
     let capturedBlob = null
+    let captured = false
 
+    // 替换createObjectURL函数
     iframe.contentWindow.URL.createObjectURL = function(blob) {
       console.log('捕获到下载的Blob:', blob.type, blob.size, 'bytes')
       capturedBlob = blob
-      return originalCreateObjectURL.call(this, blob)
+      captured = true
+
+      // 调用原始函数
+      const url = originalCreateObjectURL.call(this, blob)
+
+      // 立即处理捕获的数据
+      setTimeout(() => {
+        if (capturedBlob && captured) {
+          // 转换为base64
+          const reader = new FileReader()
+          reader.onload = () => {
+            const base64Data = reader.result
+            console.log('下载的PDF数据已转换为base64，长度:', base64Data.length)
+
+            // 恢复原始函数
+            iframe.contentWindow.URL.createObjectURL = originalCreateObjectURL
+            iframe.contentWindow.URL.revokeObjectURL = originalRevokeObjectURL
+
+            resolve(base64Data)
+          }
+          reader.readAsDataURL(capturedBlob)
+        }
+      }, 100)
+
+      return url
     }
 
-    // 监听下载开始
-    const downloadHandler = (event) => {
-      console.log('检测到下载事件:', event)
-      if (capturedBlob) {
-        // 转换为base64
-        const reader = new FileReader()
-        reader.onload = () => {
-          const base64Data = reader.result
-          console.log('下载的PDF数据已转换为base64，长度:', base64Data.length)
-
-          // 恢复原始函数
-          iframe.contentWindow.URL.createObjectURL = originalCreateObjectURL
-          iframe.contentWindow.URL.revokeObjectURL = originalRevokeObjectURL
-          iframe.contentWindow.removeEventListener('download', downloadHandler)
-
-          resolve(base64Data)
-        }
-        reader.readAsDataURL(capturedBlob)
-      } else {
+    // 设置超时保护
+    setTimeout(() => {
+      if (!captured) {
+        console.log('下载拦截超时，恢复原始函数')
         // 恢复原始函数
         iframe.contentWindow.URL.createObjectURL = originalCreateObjectURL
         iframe.contentWindow.URL.revokeObjectURL = originalRevokeObjectURL
-        iframe.contentWindow.removeEventListener('download', downloadHandler)
 
-        // 如果没有捕获到数据，获取原始PDF
-        console.log('未能捕获下载的PDF数据，获取原始PDF')
+        fallbackMethods(iframe, resolve, reject)
+      }
+    }, 3000)
+
+  } catch (error) {
+    console.error('设置下载拦截时出错:', error)
+    fallbackMethods(iframe, resolve, reject)
+  }
+}
+
+// 备用方法
+const fallbackMethods = (iframe, resolve, reject) => {
+  console.log('使用备用方法获取PDF数据...')
+
+  // 方法1: 尝试直接从PDF文档获取数据
+  try {
+    const PDFViewerApplication = iframe.contentWindow.PDFViewerApplication
+    if (PDFViewerApplication.pdfDocument) {
+      // 尝试序列化文档
+      PDFViewerApplication.pdfDocument.getData().then(data => {
+        if (data && data.length > 0) {
+          console.log('备用方法成功获取PDF数据，大小:', data.length, 'bytes')
+          const reader = new FileReader()
+          reader.onload = () => {
+            const base64Data = reader.result
+            resolve(base64Data)
+          }
+          reader.readAsDataURL(new Blob([data], { type: 'application/pdf' }))
+        } else {
+          console.log('备用方法也失败，获取原始PDF')
+          fetchOriginalPDF()
+            .then(resolve)
+            .catch(reject)
+        }
+      }).catch(error => {
+        console.warn('备用方法失败:', error)
         fetchOriginalPDF()
           .then(resolve)
           .catch(reject)
-      }
-    }
-
-    iframe.contentWindow.addEventListener('download', downloadHandler)
-
-    // 触发保存/下载
-    if (PDFViewerApplication.download) {
-      console.log('触发PDF.js下载功能')
-      PDFViewerApplication.download()
-    } else if (PDFViewerApplication.pdfDocument && PDFViewerApplication.pdfDocument.download) {
-      console.log('触发PDF文档下载')
-      PDFViewerApplication.pdfDocument.download()
+      })
     } else {
-      console.log('无法触发下载，获取原始PDF')
-      // 恢复原始函数
-      iframe.contentWindow.URL.createObjectURL = originalCreateObjectURL
-      iframe.contentWindow.URL.revokeObjectURL = originalRevokeObjectURL
-      iframe.contentWindow.removeEventListener('download', downloadHandler)
-
       fetchOriginalPDF()
         .then(resolve)
         .catch(reject)
     }
-
-    // 设置超时，如果5秒内没有捕获到数据，则使用原始PDF
-    setTimeout(() => {
-      if (!capturedBlob) {
-        console.log('下载捕获超时，使用原始PDF')
-        // 恢复原始函数
-        iframe.contentWindow.URL.createObjectURL = originalCreateObjectURL
-        iframe.contentWindow.URL.revokeObjectURL = originalRevokeObjectURL
-        iframe.contentWindow.removeEventListener('download', downloadHandler)
-
-        fetchOriginalPDF()
-          .then(resolve)
-          .catch(reject)
-      }
-    }, 5000)
-
   } catch (error) {
-    console.error('触发下载时出错:', error)
-    reject(error)
+    console.error('备用方法出错:', error)
+    fetchOriginalPDF()
+      .then(resolve)
+      .catch(reject)
   }
 }
+
 
 // 获取原始PDF数据
 const fetchOriginalPDF = async () => {
