@@ -1,25 +1,33 @@
 <template>
   <div class="pdf-viewer-container">
-    <!-- 保存按钮 -->
-    <div class="save-button-container" v-if="isLoaded">
-      <button
-        @click="showSaveDialog"
-        class="save-button"
-        :disabled="saving"
-        title="保存当前PDF文件"
-      >
-        <span class="save-icon">💾</span>
-        <span class="save-text">{{ saving ? '保存中...' : '保存' }}</span>
-      </button>
+    <!-- 顶部工具栏 -->
+    <div class="pdf-toolbar">
+      <div class="toolbar-left">
+        <h3 class="document-title">{{ fileName }}</h3>
+      </div>
+      <div class="toolbar-right">
+        <button
+          v-if="isLoaded"
+          @click="showSaveDialog"
+          class="save-button"
+          :disabled="saving"
+          title="保存当前PDF文件"
+        >
+          <span class="save-icon">💾</span>
+          <span class="save-text">{{ saving ? '保存中...' : '保存' }}</span>
+        </button>
+      </div>
     </div>
 
     <!-- PDF查看器 -->
-    <iframe
-      ref="pdfFrame"
-      :src="viewerUrl"
-      class="pdf-iframe"
-      @load="onIframeLoad"
-    ></iframe>
+    <div class="pdf-content">
+      <iframe
+        ref="pdfFrame"
+        :src="viewerUrl"
+        class="pdf-iframe"
+        @load="onIframeLoad"
+      ></iframe>
+    </div>
 
     <!-- 确认对话框 -->
     <ConfirmDialog
@@ -145,39 +153,135 @@ const getEditedPDFData = async () => {
       const PDFViewerApplication = iframe.contentWindow.PDFViewerApplication
 
       if (!PDFViewerApplication) {
-        console.warn('无法访问PDF.js API，返回原始PDF URL')
-        // 如果无法获取编辑数据，则返回原始PDF
-        fetchOriginalPDF()
-          .then(resolve)
-          .catch(reject)
+        console.error('无法访问PDF.js API')
+        reject(new Error('PDF.js API不可用'))
         return
       }
 
-      // 尝试序列化PDF
-      PDFViewerApplication.pdfDocument.saveDocument().then(data => {
-        if (data) {
-          // 转换为base64
-          const reader = new FileReader()
-          reader.onload = () => resolve(reader.result)
-          reader.readAsDataURL(new Blob([data], { type: 'application/pdf' }))
-        } else {
-          // 如果没有编辑内容，获取原始PDF
-          fetchOriginalPDF()
-            .then(resolve)
-            .catch(reject)
-        }
-      }).catch(error => {
-        console.warn('无法保存编辑的PDF，尝试获取原始PDF:', error)
-        fetchOriginalPDF()
-          .then(resolve)
-          .catch(reject)
-      })
+      console.log('PDF.js API可用，尝试获取编辑后的数据...')
+
+      // 方法1: 尝试保存编辑后的文档
+      if (PDFViewerApplication.pdfDocument && PDFViewerApplication.pdfDocument.saveDocument) {
+        PDFViewerApplication.pdfDocument.saveDocument().then(data => {
+          if (data && data.length > 0) {
+            console.log('成功获取编辑后的PDF数据，大小:', data.length, 'bytes')
+            // 转换为base64
+            const reader = new FileReader()
+            reader.onload = () => {
+              const base64Data = reader.result
+              console.log('PDF数据已转换为base64，长度:', base64Data.length)
+              resolve(base64Data)
+            }
+            reader.readAsDataURL(new Blob([data], { type: 'application/pdf' }))
+          } else {
+            console.log('文档没有编辑内容，尝试触发下载获取数据')
+            triggerDownloadAndCapture(iframe, resolve, reject)
+          }
+        }).catch(error => {
+          console.warn('saveDocument失败，尝试触发下载:', error)
+          triggerDownloadAndCapture(iframe, resolve, reject)
+        })
+      } else {
+        console.log('pdfDocument.saveDocument不可用，尝试触发下载')
+        triggerDownloadAndCapture(iframe, resolve, reject)
+      }
 
     } catch (error) {
       console.error('获取PDF数据时出错:', error)
       reject(error)
     }
   })
+}
+
+// 通过触发下载来捕获PDF数据
+const triggerDownloadAndCapture = (iframe, resolve, reject) => {
+  try {
+    const PDFViewerApplication = iframe.contentWindow.PDFViewerApplication
+
+    // 拦截下载事件
+    const originalCreateObjectURL = iframe.contentWindow.URL.createObjectURL
+    const originalRevokeObjectURL = iframe.contentWindow.URL.revokeObjectURL
+
+    let capturedBlob = null
+
+    iframe.contentWindow.URL.createObjectURL = function(blob) {
+      console.log('捕获到下载的Blob:', blob.type, blob.size, 'bytes')
+      capturedBlob = blob
+      return originalCreateObjectURL.call(this, blob)
+    }
+
+    // 监听下载开始
+    const downloadHandler = (event) => {
+      console.log('检测到下载事件:', event)
+      if (capturedBlob) {
+        // 转换为base64
+        const reader = new FileReader()
+        reader.onload = () => {
+          const base64Data = reader.result
+          console.log('下载的PDF数据已转换为base64，长度:', base64Data.length)
+
+          // 恢复原始函数
+          iframe.contentWindow.URL.createObjectURL = originalCreateObjectURL
+          iframe.contentWindow.URL.revokeObjectURL = originalRevokeObjectURL
+          iframe.contentWindow.removeEventListener('download', downloadHandler)
+
+          resolve(base64Data)
+        }
+        reader.readAsDataURL(capturedBlob)
+      } else {
+        // 恢复原始函数
+        iframe.contentWindow.URL.createObjectURL = originalCreateObjectURL
+        iframe.contentWindow.URL.revokeObjectURL = originalRevokeObjectURL
+        iframe.contentWindow.removeEventListener('download', downloadHandler)
+
+        // 如果没有捕获到数据，获取原始PDF
+        console.log('未能捕获下载的PDF数据，获取原始PDF')
+        fetchOriginalPDF()
+          .then(resolve)
+          .catch(reject)
+      }
+    }
+
+    iframe.contentWindow.addEventListener('download', downloadHandler)
+
+    // 触发保存/下载
+    if (PDFViewerApplication.download) {
+      console.log('触发PDF.js下载功能')
+      PDFViewerApplication.download()
+    } else if (PDFViewerApplication.pdfDocument && PDFViewerApplication.pdfDocument.download) {
+      console.log('触发PDF文档下载')
+      PDFViewerApplication.pdfDocument.download()
+    } else {
+      console.log('无法触发下载，获取原始PDF')
+      // 恢复原始函数
+      iframe.contentWindow.URL.createObjectURL = originalCreateObjectURL
+      iframe.contentWindow.URL.revokeObjectURL = originalRevokeObjectURL
+      iframe.contentWindow.removeEventListener('download', downloadHandler)
+
+      fetchOriginalPDF()
+        .then(resolve)
+        .catch(reject)
+    }
+
+    // 设置超时，如果5秒内没有捕获到数据，则使用原始PDF
+    setTimeout(() => {
+      if (!capturedBlob) {
+        console.log('下载捕获超时，使用原始PDF')
+        // 恢复原始函数
+        iframe.contentWindow.URL.createObjectURL = originalCreateObjectURL
+        iframe.contentWindow.URL.revokeObjectURL = originalRevokeObjectURL
+        iframe.contentWindow.removeEventListener('download', downloadHandler)
+
+        fetchOriginalPDF()
+          .then(resolve)
+          .catch(reject)
+      }
+    }, 5000)
+
+  } catch (error) {
+    console.error('触发下载时出错:', error)
+    reject(error)
+  }
 }
 
 // 获取原始PDF数据
@@ -210,25 +314,60 @@ onMounted(() => {
 .pdf-viewer-container {
   width: 100%;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f8f9fa;
+}
+
+/* 顶部工具栏 */
+.pdf-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  border-bottom: 1px solid #e9ecef;
+  padding: 16px 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.document-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* PDF内容区域 */
+.pdf-content {
+  flex: 1;
   position: relative;
+  overflow: hidden;
 }
 
 .pdf-iframe {
   width: 100%;
   height: 100%;
   border: none;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: white;
 }
 
 /* 保存按钮样式 */
-.save-button-container {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 1000;
-}
-
 .save-button {
   display: flex;
   align-items: center;
@@ -236,20 +375,20 @@ onMounted(() => {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
   border: none;
-  padding: 12px 20px;
-  border-radius: 12px;
+  padding: 10px 18px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-  min-width: 100px;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  min-width: 90px;
   justify-content: center;
 }
 
 .save-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
   background: linear-gradient(135deg, #059669 0%, #047857 100%);
 }
 
@@ -295,13 +434,17 @@ onMounted(() => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .save-button-container {
-    top: 10px;
-    right: 10px;
+  .pdf-toolbar {
+    padding: 12px 16px;
+  }
+
+  .document-title {
+    font-size: 16px;
+    max-width: 200px;
   }
 
   .save-button {
-    padding: 10px 16px;
+    padding: 8px 14px;
     min-width: 80px;
   }
 
@@ -310,21 +453,40 @@ onMounted(() => {
   }
 
   .save-text {
-    font-size: 12px;
+    font-size: 13px;
   }
 }
 
 @media (max-width: 480px) {
-  .save-button-container {
-    top: 8px;
-    right: 8px;
+  .pdf-toolbar {
+    padding: 8px 12px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toolbar-left {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .toolbar-right {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .document-title {
+    font-size: 14px;
+    max-width: 100%;
+    text-align: center;
   }
 
   .save-button {
     padding: 8px 12px;
     min-width: 70px;
-    flex-direction: column;
-    gap: 4px;
+  }
+
+  .save-text {
+    font-size: 12px;
   }
 }
 </style>
