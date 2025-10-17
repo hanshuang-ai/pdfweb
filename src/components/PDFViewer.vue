@@ -134,24 +134,53 @@ const savePDF = async () => {
 }
 
 
-// 直接上传到Vercel Blob (使用SDK方式)
+// 直接上传到Vercel Blob (使用XMLHttpRequest方式避免CORS问题)
 const saveDirectly = async (pathname, pdfBlob) => {
-  console.log('Using SDK upload for PDF...')
+  console.log('Using XMLHttpRequest upload for PDF to avoid CORS issues...')
 
-  // 导入Vercel Blob客户端SDK
-  const { put } = await import('@vercel/blob')
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
 
-  console.log('Uploading PDF directly to Vercel Blob...')
-  console.log('File path:', pathname)
-  console.log('File size:', pdfBlob.size, 'bytes')
+    // 监听上传进度
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = (event.loaded / event.total) * 100
+        console.log(`PDF保存进度: ${percentComplete.toFixed(2)}%`)
+      }
+    })
 
-  const blob = await put(pathname, pdfBlob, {
-    access: 'public',
-    token: blobConfig.token,
-    contentType: 'application/pdf'
+    // 监听完成事件
+    xhr.addEventListener('load', () => {
+      if (xhr.status === 200) {
+        try {
+          const result = JSON.parse(xhr.responseText)
+          console.log('PDF saved successfully:', result.url)
+          resolve({ url: result.url })
+        } catch (parseError) {
+          reject(new Error(`上传响应解析失败: ${parseError.message}`))
+        }
+      } else {
+        reject(new Error(`上传失败，状态码: ${xhr.status} ${xhr.statusText}`))
+      }
+    })
+
+    // 监听错误事件
+    xhr.addEventListener('error', () => {
+      reject(new Error('网络错误'))
+    })
+
+    // 监听中止事件
+    xhr.addEventListener('abort', () => {
+      reject(new Error('上传被中止'))
+    })
+
+    // 打开并发送请求
+    xhr.open('PUT', `https://blob.vercel-storage.com/${pathname}`, true)
+    xhr.setRequestHeader('Authorization', `Bearer ${blobConfig.token}`)
+    xhr.setRequestHeader('Content-Type', 'application/pdf')
+    xhr.setRequestHeader('x-allow-overwrite', 'true')  // 手动添加覆盖请求头
+    xhr.send(pdfBlob)
   })
-
-  console.log('PDF saved successfully:', blob.url)
 }
 
 
