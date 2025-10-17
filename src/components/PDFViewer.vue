@@ -134,9 +134,32 @@ const savePDF = async () => {
 }
 
 
-// 直接上传到Vercel Blob (使用XMLHttpRequest方式避免CORS问题)
+// 生成唯一的文件名（避免CORS问题和文件覆盖冲突）
+const generateUniquePathname = (originalPathname) => {
+  const timestamp = Date.now()
+  const randomString = Math.random().toString(36).substring(2, 8)
+
+  // 提取文件名和扩展名
+  const lastSlashIndex = originalPathname.lastIndexOf('/')
+  const directory = originalPathname.substring(0, lastSlashIndex)
+  const fullFilename = originalPathname.substring(lastSlashIndex + 1)
+  const lastDotIndex = fullFilename.lastIndexOf('.')
+  const filename = fullFilename.substring(0, lastDotIndex)
+  const extension = fullFilename.substring(lastDotIndex)
+
+  // 生成新的唯一文件名
+  const newFilename = `${filename}_edited_${timestamp}_${randomString}${extension}`
+  return `${directory}/${newFilename}`
+}
+
+// 直接上传到Vercel Blob (使用XMLHttpRequest方式，生成唯一文件名避免CORS问题)
 const saveDirectly = async (pathname, pdfBlob) => {
-  console.log('Using XMLHttpRequest upload for PDF to avoid CORS issues...')
+  console.log('Using XMLHttpRequest upload for PDF with unique filename to avoid CORS issues...')
+
+  // 生成唯一的文件名
+  const uniquePathname = generateUniquePathname(pathname)
+  console.log('Original pathname:', pathname)
+  console.log('Unique pathname:', uniquePathname)
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -174,11 +197,11 @@ const saveDirectly = async (pathname, pdfBlob) => {
       reject(new Error('上传被中止'))
     })
 
-    // 打开并发送请求
-    xhr.open('PUT', `https://blob.vercel-storage.com/${pathname}`, true)
+    // 打开并发送请求（不使用x-allow-overwrite请求头）
+    xhr.open('PUT', `https://blob.vercel-storage.com/${uniquePathname}`, true)
     xhr.setRequestHeader('Authorization', `Bearer ${blobConfig.token}`)
     xhr.setRequestHeader('Content-Type', 'application/pdf')
-    xhr.setRequestHeader('x-allow-overwrite', 'true')  // 手动添加覆盖请求头
+    // 移除 x-allow-overwrite 请求头以避免CORS问题
     xhr.send(pdfBlob)
   })
 }
