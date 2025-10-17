@@ -102,18 +102,35 @@
 
     <!-- 进度条 -->
     <div v-if="uploading" class="progress-section">
-      <div class="progress-header">
-        <span>上传进度 - {{ selectedFiles.length }} 个文件</span>
-        <span class="progress-percentage">{{ uploadProgress }}%</span>
+      <!-- 当前文件进度 -->
+      <div class="current-file-progress">
+        <div class="progress-header">
+          <span>正在上传: {{ currentFileName || '准备中...' }} ({{ currentFileIndex }}/{{ selectedFiles.length }})</span>
+          <span class="progress-percentage">{{ currentFileProgress }}%</span>
+        </div>
+        <div class="progress-bar current-file-bar">
+          <div
+            class="progress-fill current-file-fill"
+            :style="{ width: currentFileProgress + '%' }"
+          ></div>
+        </div>
       </div>
-      <div class="progress-bar">
-        <div
-          class="progress-fill"
-          :style="{ width: uploadProgress + '%' }"
-        ></div>
-      </div>
-      <div class="progress-status">
-        <span>正在依次上传文件...</span>
+
+      <!-- 总体进度 -->
+      <div class="total-progress">
+        <div class="progress-header">
+          <span>总体进度 - {{ selectedFiles.length }} 个文件</span>
+          <span class="progress-percentage">{{ uploadProgress }}%</span>
+        </div>
+        <div class="progress-bar total-progress-bar">
+          <div
+            class="progress-fill total-progress-fill"
+            :style="{ width: uploadProgress + '%' }"
+          ></div>
+        </div>
+        <div class="progress-status">
+          <span v-if="currentFileName">正在依次上传文件...</span>
+        </div>
       </div>
     </div>
 
@@ -152,6 +169,9 @@ export default {
     const selectedFiles = ref([])
     const uploading = ref(false)
     const uploadProgress = ref(0)
+    const currentFileProgress = ref(0)
+    const currentFileIndex = ref(0)
+    const currentFileName = ref('')
     const error = ref('')
     const success = ref(false)
     const fileUrl = ref('')
@@ -204,6 +224,9 @@ export default {
       error.value = ''
       success.value = false
       uploadProgress.value = 0
+      currentFileProgress.value = 0
+      currentFileIndex.value = 0
+      currentFileName.value = ''
       fileUrl.value = ''
     }
 
@@ -243,6 +266,9 @@ export default {
       error.value = ''
       success.value = false
       uploadProgress.value = 0
+      currentFileProgress.value = 0
+      currentFileIndex.value = 0
+      currentFileName.value = ''
 
       try {
         console.log('=== MULTI-FILE UPLOAD START ===');
@@ -270,11 +296,18 @@ export default {
           const file = selectedFiles.value[i]
           const filename = generateUniqueFilename(file)
 
+          // 更新当前文件状态
+          currentFileIndex.value = i + 1
+          currentFileName.value = file.name
+          currentFileProgress.value = 0
+
           try {
             console.log(`正在上传 ${i + 1}/${selectedFiles.value.length}:`, file.name);
 
             // 上传单个文件，更新进度
             const result = await uploadDirectlyWithProgress(file, filename, (progress) => {
+              // 更新当前文件进度
+              currentFileProgress.value = progress
               // 计算该文件已上传的大小
               const fileUploadedSize = (progress / 100) * file.size
               // 计算总体进度
@@ -284,18 +317,21 @@ export default {
 
             results.push(result)
             uploadedSize += file.size
+            currentFileProgress.value = 100
             successCount++
             console.log(`✅ ${file.name} 上传成功`)
 
           } catch (fileError) {
             console.error(`❌ ${file.name} 上传失败:`, fileError.message)
             failCount++
+            currentFileProgress.value = 0
             // 即使失败也继续上传下一个文件
             continue
           }
         }
 
         uploadProgress.value = 100.00
+        currentFileProgress.value = 100
 
         // 根据上传结果设置状态
         if (failCount === 0) {
@@ -399,6 +435,9 @@ export default {
       selectedFiles,
       uploading,
       uploadProgress,
+      currentFileProgress,
+      currentFileIndex,
+      currentFileName,
       error,
       success,
       fileUrl,
