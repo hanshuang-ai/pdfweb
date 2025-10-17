@@ -148,8 +148,7 @@ const saveDirectly = async (pathname, pdfBlob) => {
   const blob = await put(pathname, pdfBlob, {
     access: 'public',
     token: blobConfig.token,
-    contentType: 'application/pdf',
-    allowOverwrite: true
+    contentType: 'application/pdf'
   })
 
   console.log('PDF saved successfully:', blob.url)
