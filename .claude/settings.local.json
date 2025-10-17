@@ -12,7 +12,8 @@
       "Bash(rm:*)",
       "Bash(git config:*)",
       "Bash(node:*)",
-      "Bash(npm run ac:*)"
+      "Bash(npm run ac:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

@@ -134,76 +134,45 @@ const savePDF = async () => {
 }
 
 
-// 生成唯一的文件名（避免CORS问题和文件覆盖冲突）
-const generateUniquePathname = (originalPathname) => {
-  const timestamp = Date.now()
-  const randomString = Math.random().toString(36).substring(2, 8)
-
-  // 提取文件名和扩展名
-  const lastSlashIndex = originalPathname.lastIndexOf('/')
-  const directory = originalPathname.substring(0, lastSlashIndex)
-  const fullFilename = originalPathname.substring(lastSlashIndex + 1)
-  const lastDotIndex = fullFilename.lastIndexOf('.')
-  const filename = fullFilename.substring(0, lastDotIndex)
-  const extension = fullFilename.substring(lastDotIndex)
-
-  // 生成新的唯一文件名
-  const newFilename = `${filename}_edited_${timestamp}_${randomString}${extension}`
-  return `${directory}/${newFilename}`
-}
-
-// 直接上传到Vercel Blob (使用XMLHttpRequest方式，生成唯一文件名避免CORS问题)
+// 直接上传到Vercel Blob (使用官方推荐的SDK方式)
 const saveDirectly = async (pathname, pdfBlob) => {
-  console.log('Using XMLHttpRequest upload for PDF with unique filename to avoid CORS issues...')
+  console.log('Using Vercel Blob SDK for PDF upload...')
 
-  // 生成唯一的文件名
-  const uniquePathname = generateUniquePathname(pathname)
+  // 导入Vercel Blob客户端SDK
+  const { put } = await import('@vercel/blob')
+
+  console.log('Uploading PDF directly to Vercel Blob...')
   console.log('Original pathname:', pathname)
-  console.log('Unique pathname:', uniquePathname)
+  console.log('File size:', pdfBlob.size, 'bytes')
 
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-
-    // 监听上传进度
-    xhr.upload.addEventListener('progress', (event) => {
-      if (event.lengthComputable) {
-        const percentComplete = (event.loaded / event.total) * 100
-        console.log(`PDF保存进度: ${percentComplete.toFixed(2)}%`)
-      }
+  try {
+    // 使用SDK方式，添加随机后缀避免覆盖问题，同时避免CORS问题
+    const blob = await put(pathname, pdfBlob, {
+      access: 'public',
+      token: blobConfig.token,
+      contentType: 'application/pdf',
+      addRandomSuffix: true  // 使用官方推荐的方式避免文件名冲突
     })
 
-    // 监听完成事件
-    xhr.addEventListener('load', () => {
-      if (xhr.status === 200) {
-        try {
-          const result = JSON.parse(xhr.responseText)
-          console.log('PDF saved successfully:', result.url)
-          resolve({ url: result.url })
-        } catch (parseError) {
-          reject(new Error(`上传响应解析失败: ${parseError.message}`))
-        }
-      } else {
-        reject(new Error(`上传失败，状态码: ${xhr.status} ${xhr.statusText}`))
-      }
+    console.log('PDF saved successfully:', blob.url)
+    return { url: blob.url }
+  } catch (error) {
+    console.error('SDK upload failed:', error)
+
+    // 如果SDK方式失败，尝试生成唯一文件名的方式
+    console.log('Attempting with unique filename...')
+    const timestamp = Date.now()
+    const uniquePathname = pathname.replace(/\.pdf$/, `_edited_${timestamp}.pdf`)
+
+    const blob = await put(uniquePathname, pdfBlob, {
+      access: 'public',
+      token: blobConfig.token,
+      contentType: 'application/pdf'
     })
 
-    // 监听错误事件
-    xhr.addEventListener('error', () => {
-      reject(new Error('网络错误'))
-    })
-
-    // 监听中止事件
-    xhr.addEventListener('abort', () => {
-      reject(new Error('上传被中止'))
-    })
-
-    // 打开并发送请求（不使用x-allow-overwrite请求头）
-    xhr.open('PUT', `https://blob.vercel-storage.com/${uniquePathname}`, true)
-    xhr.setRequestHeader('Authorization', `Bearer ${blobConfig.token}`)
-    xhr.setRequestHeader('Content-Type', 'application/pdf')
-    // 移除 x-allow-overwrite 请求头以避免CORS问题
-    xhr.send(pdfBlob)
-  })
+    console.log('PDF saved with unique filename:', blob.url)
+    return { url: blob.url }
+  }
 }
 
 
