@@ -7,8 +7,6 @@
     "build": "vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "commit": "node auto-commit.js",
-    "ac": "node auto-commit.js"
   },
   "dependencies": {
     "@vercel/blob": "^2.0.0",
