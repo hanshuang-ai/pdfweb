@@ -414,20 +414,7 @@ export default {
       })
     }
 
-    const uploadDirectly = async (file, filename) => {
-      try {
-        const { put } = await import('@vercel/blob')
-        const blob = await put(filename, file, {
-          access: 'public',
-          token: blobConfig.token,
-          contentType: file.type || 'application/octet-stream'
-        })
-        return { url: blob.url }
-      } catch (directError) {
-        console.error(`Direct upload failed for ${file.name}:`, directError);
-        throw new Error(`直接上传失败: ${directError.message}`)
-      }
-    }
+
 
     return {
       fileInput,
@@ -449,7 +436,7 @@ export default {
       handleDragLeave,
       handleDrop,
       uploadFile,
-      uploadDirectly,
+
       uploadDirectlyWithProgress,
       formatFileSize,
       clearFiles,

@@ -98,25 +98,17 @@ const savePDF = async () => {
     console.log('PDF URL:', pdfUrl.value)
     console.log('File name:', fileName.value)
 
-    // 获取编辑后的PDF数据
+    // 获取编辑后的PDF数据（已经是Base64格式）
     const editedPdfData = await getEditedPDFData()
 
     if (!editedPdfData) {
       throw new Error('无法获取编辑后的PDF数据')
     }
 
-    // 获取pathname（从URL中提取路径部分）
-    const url = new URL(pdfUrl.value)
-    const pathname = url.pathname
+    console.log('Got edited PDF data (base64 format):', editedPdfData.length, 'characters')
 
-    console.log('Extracted pathname:', pathname)
-
-    // 将base64转换为Blob
-    const pdfBlob = await fetch(editedPdfData).then(res => res.blob())
-    console.log('PDF blob size:', pdfBlob.size, 'bytes')
-
-    // 使用SDK方式保存
-    await saveDirectly(pathname, pdfBlob)
+    // 直接使用API保存（传递Base64数据）
+    await saveDirectly('', editedPdfData)
 
     // 显示成功提示
     if (window.$toast) {
@@ -134,43 +126,59 @@ const savePDF = async () => {
 }
 
 
-// 直接上传到Vercel Blob (使用官方推荐的SDK方式)
-const saveDirectly = async (pathname, pdfBlob) => {
-  console.log('Using Vercel Blob SDK for PDF upload...')
+// 使用服务端API上传PDF（避免CORS问题，支持文件覆盖）
+const saveDirectly = async (unusedPathname, base64Data) => {
+  console.log('Using server API for PDF upload to avoid CORS issues...')
 
-  // 导入Vercel Blob客户端SDK
-  const { put } = await import('@vercel/blob')
+  // 获取pathname（从URL中提取路径部分）
+  const url = new URL(pdfUrl.value)
+  const extractedPathname = url.pathname
 
-  console.log('Uploading PDF directly to Vercel Blob...')
-  console.log('Original pathname:', pathname)
-  console.log('File size:', pdfBlob.size, 'bytes')
+  console.log('Target pathname:', extractedPathname)
+  console.log('Base64 data length:', base64Data.length, 'characters')
 
   try {
-    // 使用SDK方式，添加随机后缀避免覆盖问题，同时避免CORS问题
-    const blob = await put(pathname, pdfBlob, {
-      access: 'public',
-      token: blobConfig.token,
-      contentType: 'application/pdf',
-      addRandomSuffix: true  // 使用官方推荐的方式避免文件名冲突
+    // 调用服务端API上传（直接使用Base64数据）
+    const response = await fetch('/api/update-pdf', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pathname: extractedPathname,
+        newPdfData: base64Data,
+        mimeType: 'application/pdf'
+      })
     })
 
-    console.log('PDF saved successfully:', blob.url)
-    return { url: blob.url }
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.details || `API上传失败: ${response.statusText}`)
+    }
+
+    const result = await response.json()
+    console.log('PDF saved via API successfully:', result.url)
+    return { url: result.url }
+
   } catch (error) {
-    console.error('SDK upload failed:', error)
+    console.error('API upload failed:', error)
 
-    // 如果SDK方式失败，尝试生成唯一文件名的方式
-    console.log('Attempting with unique filename...')
+    // 备用方案：使用客户端SDK，但生成唯一文件名
+    console.log('Attempting fallback with client SDK...')
+
+    // 将Base64转换回Blob
+    const pdfBlob = await fetch(base64Data).then(res => res.blob())
     const timestamp = Date.now()
-    const uniquePathname = pathname.replace(/\.pdf$/, `_edited_${timestamp}.pdf`)
+    const uniquePathname = extractedPathname.replace(/\.pdf$/, `_edited_${timestamp}.pdf`)
 
+    const { put } = await import('@vercel/blob')
     const blob = await put(uniquePathname, pdfBlob, {
       access: 'public',
       token: blobConfig.token,
       contentType: 'application/pdf'
     })
 
-    console.log('PDF saved with unique filename:', blob.url)
+    console.log('PDF saved with fallback method:', blob.url)
     return { url: blob.url }
   }
 }
