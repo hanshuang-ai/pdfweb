@@ -115,16 +115,8 @@ const savePDF = async () => {
     const pdfBlob = await fetch(editedPdfData).then(res => res.blob())
     console.log('PDF blob size:', pdfBlob.size, 'bytes')
 
-    // 根据文件大小选择保存策略
-    const maxApiSize = 4.5 * 1024 * 1024 // 4.5MB
-
-    if (pdfBlob.size <= maxApiSize) {
-      console.log('Using API upload for small PDF')
-      await saveViaAPI(pathname, editedPdfData)
-    } else {
-      console.log('Using direct upload for large PDF')
-      await saveDirectly(pathname, pdfBlob)
-    }
+    // 使用SDK方式保存
+    await saveDirectly(pathname, pdfBlob)
 
     // 显示成功提示
     if (window.$toast) {
@@ -141,132 +133,28 @@ const savePDF = async () => {
   }
 }
 
-// 通过API保存 (小文件)
-const saveViaAPI = async (pathname, editedPdfData) => {
-  const response = await fetch('/api/update-pdf', {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      pathname: pathname,
-      newPdfData: editedPdfData,
-      mimeType: 'application/pdf'
-    })
-  })
 
-  if (!response.ok) {
-    const errorData = await response.json()
-    throw new Error(errorData.details || `保存失败: ${response.statusText}`)
-  }
-
-  const result = await response.json()
-  console.log('PDF saved via API successfully:', result)
-}
-
-// 直接上传到Vercel Blob (使用SDK方式，参考首页实现)
+// 直接上传到Vercel Blob (使用SDK方式)
 const saveDirectly = async (pathname, pdfBlob) => {
-  try {
-    console.log('Using SDK upload for PDF...')
+  console.log('Using SDK upload for PDF...')
 
-    // 导入Vercel Blob客户端SDK
-    const { put } = await import('@vercel/blob')
+  // 导入Vercel Blob客户端SDK
+  const { put } = await import('@vercel/blob')
 
-    console.log('Uploading PDF directly to Vercel Blob...')
-    console.log('File path:', pathname)
-    console.log('File size:', pdfBlob.size, 'bytes')
+  console.log('Uploading PDF directly to Vercel Blob...')
+  console.log('File path:', pathname)
+  console.log('File size:', pdfBlob.size, 'bytes')
 
-    const blob = await put(pathname, pdfBlob, {
-      access: 'public',
-      token: blobConfig.token,
-      contentType: 'application/pdf',
-      allowOverwrite: true
-    })
-
-    console.log('PDF saved directly successfully:', blob.url)
-    return { url: blob.url }
-
-  } catch (directError) {
-    console.error('SDK upload failed:', directError)
-    console.log('Attempting fallback to XMLHttpRequest upload...')
-
-    // 备用机制：使用XMLHttpRequest直接上传（参考首页实现）
-    try {
-      const result = await uploadDirectlyWithXHR(pathname, pdfBlob)
-      console.log('Fallback XMLHttpRequest upload successful')
-      return result
-    } catch (xhrError) {
-      console.error('XMLHttpRequest upload also failed:', xhrError)
-      console.log('Attempting final fallback to API upload...')
-
-      // 最后备用机制：转换为base64后通过API上传
-      try {
-        const base64Data = await convertBlobToBase64(pdfBlob)
-        await saveViaAPI(pathname, base64Data)
-        console.log('Final fallback API upload successful')
-        return { url: pdfUrl.value }
-      } catch (fallbackError) {
-        console.error('All upload methods failed:', fallbackError)
-        throw new Error(`SDK上传失败: ${directError.message}，XMLHttpRequest上传失败: ${xhrError.message}，API上传也失败: ${fallbackError.message}`)
-      }
-    }
-  }
-}
-
-// 使用XMLHttpRequest直接上传（参考首页实现方式）
-const uploadDirectlyWithXHR = (pathname, pdfBlob) => {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-
-    // 监听上传进度（可选，用于调试）
-    xhr.upload.addEventListener('progress', (event) => {
-      if (event.lengthComputable) {
-        const percentComplete = (event.loaded / event.total) * 100
-        console.log(`PDF保存进度: ${percentComplete.toFixed(2)}%`)
-      }
-    })
-
-    // 监听完成事件
-    xhr.addEventListener('load', () => {
-      if (xhr.status === 200) {
-        try {
-          const result = JSON.parse(xhr.responseText)
-          resolve({ url: result.url })
-        } catch (parseError) {
-          reject(new Error(`上传响应解析失败: ${parseError.message}`))
-        }
-      } else {
-        reject(new Error(`上传失败，状态码: ${xhr.status} ${xhr.statusText}`))
-      }
-    })
-
-    // 监听错误事件
-    xhr.addEventListener('error', () => {
-      reject(new Error('网络错误'))
-    })
-
-    // 监听中止事件
-    xhr.addEventListener('abort', () => {
-      reject(new Error('上传被中止'))
-    })
-
-    // 打开并发送请求
-    xhr.open('PUT', `https://blob.vercel-storage.com/${pathname}`, true)
-    xhr.setRequestHeader('Authorization', `Bearer ${blobConfig.token}`)
-    xhr.setRequestHeader('Content-Type', 'application/pdf')
-    xhr.send(pdfBlob)
+  const blob = await put(pathname, pdfBlob, {
+    access: 'public',
+    token: blobConfig.token,
+    contentType: 'application/pdf',
+    allowOverwrite: true
   })
+
+  console.log('PDF saved successfully:', blob.url)
 }
 
-// 将Blob转换为base64
-const convertBlobToBase64 = (blob) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
-}
 
 // 从PDF.js iframe中获取编辑后的PDF数据
 const getEditedPDFData = async () => {
